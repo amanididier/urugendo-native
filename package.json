@@ -1,0 +1,21 @@
+{
+  "name": "urugendo-native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Urugendo native apps monorepo – Passenger + Agency (Expo). Completely isolated from the existing PWA.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "passenger": "npm run start --workspace=apps/passenger",
+    "agency": "npm run start --workspace=apps/agency",
+    "passenger:android": "npm run android --workspace=apps/passenger",
+    "passenger:ios": "npm run ios --workspace=apps/passenger",
+    "agency:android": "npm run android --workspace=apps/agency",
+    "agency:ios": "npm run ios --workspace=apps/agency"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

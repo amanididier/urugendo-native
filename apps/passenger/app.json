@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Urugendo",
+    "slug": "urugendo-passenger",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.urugendo.passenger"
+    },
+    "android": {
+      "package": "com.urugendo.passenger",
+      "adaptiveIcon": {
+        "backgroundColor": "#16A34A"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

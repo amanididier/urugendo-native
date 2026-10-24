@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Urugendo Agency",
+    "slug": "urugendo-agency",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.urugendo.agency"
+    },
+    "android": {
+      "package": "com.urugendo.agency",
+      "adaptiveIcon": {
+        "backgroundColor": "#16A34A"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
