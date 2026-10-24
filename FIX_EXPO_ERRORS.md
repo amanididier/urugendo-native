@@ -1,55 +1,39 @@
-# Fix Expo errors (Passenger)
+# Fix Expo errors
 
-## 1. SyntaxError: Expecting Unicode escape sequence (line ~356)
+## Syntax error — FIXED on GitHub (pull latest)
 
-Open `apps/passenger/App.js` and find this **broken** line:
-
-```js
-Kigali → Musanze{\n}14:30 · Volcano Express
-```
-
-Replace the whole Text block with:
-
-```jsx
-<Text style={{ color: colors.textSecondary, marginTop: 8, textAlign: 'center' }}>
-  Kigali → Musanze · 14:30 · Volcano Express
-</Text>
-```
-
-Save the file.
-
-## 2. Unable to resolve asset "./assets/icon.png"
-
-From `apps/passenger` run:
+The invalid `{\n}` in TicketScreen is fixed on `main`.
 
 ```bash
-# If assets folder is empty/missing, recreate default Expo assets:
-npx expo install
-# Or copy icon from a fresh template:
-# npx create-expo-app /tmp/expo-tmp
-# copy /tmp/expo-tmp/assets/* into apps/passenger/assets/
+cd urugendo-native
+git pull origin main
 ```
 
-Make sure these files exist:
-- `apps/passenger/assets/icon.png`
-- `apps/passenger/assets/splash-icon.png`
-- `apps/passenger/assets/favicon.png`
+## Missing icon.png
 
-## 3. Install Supabase (same DB as PWA)
+Assets were not always committed. From repo root:
+
+```bash
+node scripts/ensure-assets.js
+```
+
+Or:
+
+```bash
+cd apps/passenger
+npx create-expo-app@latest C:\Users\HP\expo-tmp --template blank
+xcopy C:\Users\HP\expo-tmp\assets\* assets\ /Y
+```
+
+## Supabase (same DB as PWA)
 
 ```bash
 cd apps/passenger
 npm install @supabase/supabase-js
-```
-
-Client is at `apps/passenger/src/lib/supabase.js`  
-Project: `https://zrvcqlyowqfrqdidozrk.supabase.co` (same as PWA)
-
-## 4. Restart Expo
-
-```bash
-cd apps/passenger
 npx expo start -c
 ```
 
-Then scan QR again with Expo Go.
+Client: `apps/passenger/src/lib/supabase.js`  
+URL: `https://zrvcqlyowqfrqdidozrk.supabase.co`
+
+Same for `apps/agency`.
