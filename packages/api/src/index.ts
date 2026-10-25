@@ -71,10 +71,11 @@ export async function signInPassenger(client: SupabaseClient, email: string, pas
   if (error) throw new ApiError(error.message, error.name);
   return data.user;
 }
-export async function signUpPassenger(client: SupabaseClient, input: { email: string; password: string; fullName: string; phone: string }) {
+export async function signUpPassenger(client: SupabaseClient, input: { email: string; password: string; fullName: string; phone?: string }) {
   const email = required(input.email, 'Email').toLowerCase();
   const password = required(input.password, 'Password');
-  const fullName = required(input.fullName, 'Full name'); const phone = required(input.phone, 'Phone number');
+  const fullName = required(input.fullName, 'Full name'); const phone = input.phone?.trim() || null;
+  if (password.length < 8) throw new ApiError('Use a password with at least 8 characters.', 'WEAK_PASSWORD');
   const { data, error } = await client.auth.signUp({ email, password, options: { data: { full_name: fullName, phone, role: 'passenger' } } });
   if (error) throw new ApiError(error.message, error.name);
   if (data.user && data.session) {
