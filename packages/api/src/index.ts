@@ -24,6 +24,15 @@ export class ApiError extends Error {
   code?: string;
   constructor(message: string, code?: string) { super(message); this.name = 'ApiError'; this.code = code; }
 }
+export function normalizeRwandaPhone(phone: string): string {
+  const digits = String(phone || '').replace(/\\D/g, '');
+  if (digits.startsWith('250') && digits.length === 12 && /^250[7-8]\\d{8}$/.test(digits)) return digits;
+  if (digits.startsWith('07') && digits.length === 10) return '250' + digits.slice(1);
+  if (digits.startsWith('7') && digits.length === 9) return '250' + digits;
+  if (digits.startsWith('08') && digits.length === 10) return '250' + digits.slice(1);
+  if (digits.startsWith('8') && digits.length === 9) return '250' + digits;
+  throw new ApiError('Enter a valid Rwanda mobile number, such as 078… or +25078…', 'INVALID_PHONE');
+}
 const required = (value: string, label: string) => {
   const cleaned = value?.trim();
   if (!cleaned) throw new ApiError(`${label} is required.`, 'VALIDATION');
@@ -115,7 +124,7 @@ export async function createPassengerBooking(client: SupabaseClient, input: Crea
   if (!user) throw new ApiError('Sign in before booking a trip.', 'SIGN_IN_REQUIRED');
   const passengerName = required(input.passengerName, 'Passenger name');
   const passengerPhone = required(input.passengerPhone, 'Passenger phone');
-  const momoNumber = required(input.momoNumber, 'MoMo number');
+  const momoNumber = normalizeRwandaPhone(required(input.momoNumber, 'MoMo number'));
   const passengerCount = Math.floor(Number(input.passengerCount));
   if (!Number.isInteger(passengerCount) || passengerCount < 1 || passengerCount > 50) {
     throw new ApiError('Passenger count must be between 1 and 50.', 'VALIDATION');
