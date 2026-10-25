@@ -173,3 +173,49 @@ export async function checkPassengerPaymentStatus(client: SupabaseClient, refere
   if (data?.error) throw new ApiError(data.error, 'PAYMENT_STATUS_ERROR');
   return { status: data?.status || 'pending', message: data?.message };
 }
+
+
+function toRwandaE164(phone: string): string {
+  const normalized = normalizeRwandaPhone(phone);
+  if (!normalized || normalized.startsWith('467')) throw new ApiError('Enter a valid Rwanda mobile number.', 'INVALID_PHONE');
+  return `+${normalized}`;
+}
+
+export async function signInPassengerWithPhone(client: SupabaseClient, phone: string, password: string) {
+  const cleanPhone = toRwandaE164(required(phone, 'Phone number'));
+  required(password, 'Password');
+  const { data, error } = await client.auth.signInWithPassword({ phone: cleanPhone, password });
+  if (error) throw new ApiError(error.message, error.name);
+  return data.user;
+}
+
+export async function signUpPassengerWithPhone(client: SupabaseClient, input: { phone: string; password: string; fullName: string }) {
+  const phone = toRwandaE164(required(input.phone, 'Phone number'));
+  const password = required(input.password, 'Password');
+  if (password.length < 8) throw new ApiError('Use a password with at least 8 characters.', 'WEAK_PASSWORD');
+  const fullName = required(input.fullName, 'Full name');
+  const { data, error } = await client.auth.signUp({
+    phone, password,
+    options: { data: { full_name: fullName, phone, role: 'passenger' } },
+  });
+  if (error) throw new ApiError(error.message, error.name);
+  if (data.user && data.session) {
+    const { error: profileError } = await client.from('profiles').upsert({
+      id: data.user.id, full_name: fullName, phone, role: 'passenger',
+    }, { onConflict: 'id' });
+    if (profileError) throw new ApiError(`Account created, but passenger profile setup failed: ${profileError.message}`, profileError.code);
+  }
+  return { user: data.user, needsPhoneConfirmation: !data.session, phone, fullName };
+}
+
+export async function verifyPassengerPhone(client: SupabaseClient, phone: string, token: string, fullName: string) {
+  const cleanPhone = toRwandaE164(required(phone, 'Phone number'));
+  const code = required(token, 'SMS verification code');
+  const { data, error } = await client.auth.verifyOtp({ phone: cleanPhone, token: code, type: 'sms' });
+  if (error || !data.user) throw new ApiError(error?.message || 'Phone verification failed.', error?.name);
+  const { error: profileError } = await client.from('profiles').upsert({
+    id: data.user.id, full_name: required(fullName, 'Full name'), phone: cleanPhone, role: 'passenger',
+  }, { onConflict: 'id' });
+  if (profileError) throw new ApiError(`Phone verified, but profile setup failed: ${profileError.message}`, profileError.code);
+  return data.user;
+}
