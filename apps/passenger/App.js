@@ -369,6 +369,7 @@ function AuthScreen({ busy, onBack, onSubmit, onVerifyPhone, initialMode = 'sign
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  useEffect(() => { setMode(initialMode); }, [initialMode]);
   return (
     <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <PageHeader title={mode === 'verify-phone' ? 'Verify your phone' : mode === 'signin' ? 'Welcome back' : 'Create account'} subtitle={mode === 'verify-phone' ? 'Enter the SMS code sent to ' + pendingPhone : 'Your tickets stay connected to your account'} onBack={onBack} />
