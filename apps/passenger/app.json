@@ -18,6 +18,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "scheme": "urugendo-passenger"
   }
 }
