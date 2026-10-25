@@ -76,10 +76,10 @@ export async function signUpPassenger(client: SupabaseClient, input: { email: st
   const password = required(input.password, 'Password');
   const fullName = required(input.fullName, 'Full name'); const phone = input.phone?.trim() || null;
   if (password.length < 8) throw new ApiError('Use a password with at least 8 characters.', 'WEAK_PASSWORD');
-  const { data, error } = await client.auth.signUp({ email, password, options: { data: { full_name: fullName, phone, role: 'passenger' } } });
+  const { data, error } = await client.auth.signUp({ email, password, options: { data: { full_name: fullName, phone } } });
   if (error) throw new ApiError(error.message, error.name);
   if (data.user && data.session) {
-    const { error: profileError } = await client.from('profiles').upsert({ id: data.user.id, full_name: fullName, phone, role: 'passenger' }, { onConflict: 'id' });
+    const { error: profileError } = await client.from('profiles').upsert({ id: data.user.id, full_name: fullName, phone }, { onConflict: 'id' });
     if (profileError) throw new ApiError(`Account created, but passenger profile setup failed: ${profileError.message}`, profileError.code);
   }
   return { user: data.user, needsEmailConfirmation: !data.session };
@@ -197,12 +197,12 @@ export async function signUpPassengerWithPhone(client: SupabaseClient, input: { 
   const fullName = required(input.fullName, 'Full name');
   const { data, error } = await client.auth.signUp({
     phone, password,
-    options: { data: { full_name: fullName, phone, role: 'passenger' } },
+    options: { data: { full_name: fullName, phone } },
   });
   if (error) throw new ApiError(error.message, error.name);
   if (data.user && data.session) {
     const { error: profileError } = await client.from('profiles').upsert({
-      id: data.user.id, full_name: fullName, phone, role: 'passenger',
+      id: data.user.id, full_name: fullName, phone,
     }, { onConflict: 'id' });
     if (profileError) throw new ApiError(`Account created, but passenger profile setup failed: ${profileError.message}`, profileError.code);
   }
@@ -215,7 +215,7 @@ export async function verifyPassengerPhone(client: SupabaseClient, phone: string
   const { data, error } = await client.auth.verifyOtp({ phone: cleanPhone, token: code, type: 'sms' });
   if (error || !data.user) throw new ApiError(error?.message || 'Phone verification failed.', error?.name);
   const { error: profileError } = await client.from('profiles').upsert({
-    id: data.user.id, full_name: required(fullName, 'Full name'), phone: cleanPhone, role: 'passenger',
+    id: data.user.id, full_name: required(fullName, 'Full name'), phone: cleanPhone,
   }, { onConflict: 'id' });
   if (profileError) throw new ApiError(`Phone verified, but profile setup failed: ${profileError.message}`, profileError.code);
   return data.user;
