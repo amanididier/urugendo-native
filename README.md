@@ -46,7 +46,7 @@ Open Expo Go on your phone and scan the QR code. If Metro asks to install compat
 2. **Phone signup:** enable Phone authentication and configure an SMS provider in Supabase Auth. Phone registration sends an SMS code before the account is activated.
 3. **Email signup:** enable Email authentication in Supabase Auth.
 4. **Google sign-in:** enable Google in Supabase Auth and add the native callback URI `urugendo-passenger://auth/callback` to the allowed redirect URLs. Also configure the OAuth redirect URI in the Google provider settings.
-5. **MTN sandbox:** server-side MTN credentials are configured as Supabase Edge Function secrets. Sandbox test numbers simulate MTN outcomes; they do not prove live Rwandan MoMo settlement. Sandbox requests use a €1 test amount while Urugendo records the actual fare in RWF.
+5. **MTN sandbox:** `MTN_COLLECTION_SUBSCRIPTION_KEY`, `MTN_API_USER_ID`, and `MTN_API_KEY` are configured as server-side Supabase Edge Function secrets. Sandbox test numbers simulate MTN outcomes; they do not prove live Rwandan MoMo settlement. Sandbox requests use a €1 test amount while Urugendo records the actual fare in RWF. Do not switch to production until MTN has issued live Rwanda credentials and confirmed the correct current API base URL. Set `MTN_TARGET_ENV=mtnrwanda` and `MTN_BASE_URL` only for the approved production setup; never reuse sandbox credentials for live collections.
 
 The PWA guest checkout does not require an account. It reserves capacity on the server, sends an MTN request-to-pay, and activates the ticket only after the provider confirms payment. Pending reservations expire after 15 minutes.
 
