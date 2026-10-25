@@ -100,15 +100,12 @@ export async function fetchTrips(client: SupabaseClient, filters: { from?: strin
   // Capacity is based on the manager-entered total_seats minus active booking passenger counts.
   // Do not rely on potentially stale available_seats values maintained by older PWA flows.
   const { data: reservations, error: reservationError } = await client.from('bookings')
-    .select('trip_id, passenger_count, status, created_at')
+    .select('trip_id, passenger_count, status')
     .in('trip_id', rows.map((row: any) => row.id))
     .not('status', 'in', '("rejected","cancelled","expired","past")');
   if (reservationError) throw new ApiError(`Could not calculate seat availability: ${reservationError.message}`, reservationError.code);
   const used = new Map<string, number>();
   for (const booking of reservations || []) {
-    const stalePending = booking.status === 'pending' && booking.created_at &&
-      Date.now() - new Date(booking.created_at).getTime() >= 15 * 60 * 1000;
-    if (stalePending) continue;
     used.set(booking.trip_id, (used.get(booking.trip_id) || 0) + Math.max(1, Number(booking.passenger_count || 1)));
   }
   return rows.map((row: any) => {
