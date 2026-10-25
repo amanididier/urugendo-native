@@ -38,7 +38,7 @@ cd apps/agency
 npx expo start --tunnel
 ```
 
-Open Expo Go on your phone and scan the QR code. Before launching each app, run `npx expo install --fix` and `npx expo-doctor` from that app's folder to align native dependencies with the installed Expo SDK; Expo recommends using `npx expo install` for compatible library versions. citeturn257839search6turn257839search9
+Open Expo Go on your phone and scan the QR code. Before launching each app, run `npx expo install --fix` and `npx expo-doctor` from that app's folder to align native dependencies with the installed Expo SDK; Expo recommends using `npx expo install` for compatible library versions ([library guide](https://docs.expo.dev/workflow/using-libraries/), [CLI guide](https://docs.expo.dev/more/expo-cli/)).
 
 ### Before testing authentication and payments
 
