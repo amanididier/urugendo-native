@@ -82,12 +82,12 @@ urugendo-native/
 ### Phase 1 – Foundation
 - [x] Scaffold Expo apps (passenger + agency)
 - [x] Set up shared packages (ui, api, config, utils)
-- [ ] Connect to existing Supabase
+- [x] Connect Passenger app to existing Supabase client with persisted native sessions\n- [x] Add shared Supabase auth, trip query, passenger booking, and ticket retrieval functions
 - [ ] Basic navigation shells
 - [ ] Design tokens + core UI components
 
 ### Phase 2 – Passenger App (Core Flow)
-- [ ] Auth, Home, Search, Seats, Payment, Ticket, My Tickets, Profile
+- [x] Passenger email/password sign-in and account creation (email confirmation respected)\n- [x] Home route/date inputs and live Supabase trip search\n- [x] Booking write using the PWA booking columns; payment is explicitly marked submitted, not verified\n- [x] My Tickets reads the signed-in user's bookings from Supabase\n- [ ] Seat inventory/seat selection integration and actual MoMo payment provider integration\n- [ ] Local Expo install/build and end-to-end test against Supabase
 
 ### Phase 3 – Agency App
 - [ ] Role-based auth & all role screens
@@ -114,7 +114,7 @@ urugendo-native/
 
 ---
 
-## 7. Rules for Every Future Session
+### 25 Oct 2026 – Session 4 (Passenger backend batch)\n- Added shared API types and operations for passenger auth, trip search, booking creation, and ticket retrieval using the existing PWA schema.\n- Added AsyncStorage-backed Supabase session persistence to the Passenger app.\n- Replaced passenger mock trip search, sign-in, ticket confirmation, and My Tickets with database-backed flows.\n- Booking confirmation is accurately labelled as submitted and awaiting agency verification; no real MoMo charge is claimed.\n- Native repository changes are on branch `feat/passenger-supabase-core`; PWA repository was not modified.\n- Not yet verified: local `npm install`, Expo bundling, and live database end-to-end behavior.\n\n---\n\n## 7. Rules for Every Future Session
 
 1. Read this file first.
 2. Never edit the original urugendo-bolt repo or live PWA.
