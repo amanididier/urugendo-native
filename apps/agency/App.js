@@ -235,6 +235,104 @@ function DashboardScreen({ segment, setSegment }) {
 }
 
 
+
+function ManagerScheduleScreen({ profile, sessionToken }) {
+  const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [departureTime, setDepartureTime] = useState('08:00');
+  const [price, setPrice] = useState('3500');
+  const [totalSeats, setTotalSeats] = useState('29');
+
+  const loadTrips = async () => {
+    if (!sessionToken) { setError('Manager session expired. Sign in again.'); setLoading(false); return; }
+    setLoading(true); setError('');
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('manager-schedule', {
+        body: { action: 'list', sessionToken },
+      });
+      if (fnError) throw new Error(fnError.message || 'Could not load scheduled trips.');
+      if (data?.error) throw new Error(data.error);
+      setTrips(Array.isArray(data?.trips) ? data.trips : []);
+    } catch (e) { setError(e?.message || 'Could not load scheduled trips.'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { loadTrips(); }, [sessionToken]);
+
+  const createTrip = async () => {
+    setError(''); setNotice('');
+    if (!from.trim() || !to.trim() || from.trim().toLowerCase() === to.trim().toLowerCase()) {
+      setError('Enter different origin and destination stations.'); return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < new Date().toISOString().slice(0, 10)) {
+      setError('Choose today or a future travel date in YYYY-MM-DD format.'); return;
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(departureTime)) { setError('Use 24-hour time, for example 08:30.'); return; }
+    if (!Number.isFinite(Number(price)) || Number(price) <= 0) { setError('Enter a valid fare in RWF.'); return; }
+    if (!Number.isInteger(Number(totalSeats)) || Number(totalSeats) < 1 || Number(totalSeats) > 100) { setError('Capacity must be between 1 and 100 seats.'); return; }
+    setSaving(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('manager-schedule', {
+        body: { action: 'create', sessionToken, trip: { from: from.trim(), to: to.trim(), date, departureTime, price: Number(price), totalSeats: Number(totalSeats) } },
+      });
+      if (fnError) throw new Error(fnError.message || 'Could not save the trip.');
+      if (data?.error) throw new Error(data.error);
+      setNotice('Trip scheduled. Passenger availability now uses this capacity.');
+      setFrom(''); setTo('');
+      await loadTrips();
+    } catch (e) { setError(e?.message || 'Could not save the trip.'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <SafeAreaView style={styles.pageHeader}>
+        <Text style={styles.pageTitle}>Trip schedule</Text>
+        <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{profile?.agencyName || 'Your agency'} · Manager only</Text>
+      </SafeAreaView>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Schedule a bus</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 5 }}>The seat count you enter becomes the passenger app's capacity. Travellers do not choose seat numbers.</Text>
+          <Text style={styles.inputLabel}>FROM</Text><TextInput style={styles.input} value={from} onChangeText={setFrom} placeholder="e.g. Kigali" placeholderTextColor={colors.muted} />
+          <Text style={styles.inputLabel}>TO</Text><TextInput style={styles.input} value={to} onChangeText={setTo} placeholder="e.g. Musanze" placeholderTextColor={colors.muted} />
+          <Text style={styles.inputLabel}>TRAVEL DATE (YYYY-MM-DD)</Text><TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="2026-10-25" placeholderTextColor={colors.muted} />
+          <Text style={styles.inputLabel}>DEPARTURE TIME (24-HOUR)</Text><TextInput style={styles.input} value={departureTime} onChangeText={setDepartureTime} placeholder="08:00" placeholderTextColor={colors.muted} />
+          <Text style={styles.inputLabel}>FARE PER PASSENGER (RWF)</Text><TextInput style={styles.input} value={price} onChangeText={setPrice} keyboardType="number-pad" placeholder="3500" placeholderTextColor={colors.muted} />
+          <Text style={styles.inputLabel}>TOTAL BUS CAPACITY</Text><TextInput style={styles.input} value={totalSeats} onChangeText={setTotalSeats} keyboardType="number-pad" placeholder="29" placeholderTextColor={colors.muted} />
+          {!!error && <Text style={{ color: '#B91C1C', marginTop: 12, lineHeight: 19 }}>{error}</Text>}
+          {!!notice && <Text style={{ color: '#15803D', marginTop: 12, lineHeight: 19 }}>{notice}</Text>}
+          <TouchableOpacity style={[styles.primaryBtn, saving && { opacity: 0.6 }]} disabled={saving} onPress={createTrip}>
+            <Text style={styles.primaryBtnText}>{saving ? 'Saving schedule…' : 'Publish trip'}</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.card}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={styles.cardTitle}>Scheduled trips</Text>
+            <TouchableOpacity onPress={loadTrips}><Text style={{ color: colors.primary, fontWeight: '700' }}>Refresh</Text></TouchableOpacity>
+          </View>
+          {loading ? <ActivityIndicator color={colors.primary} style={{ marginTop: 18 }} /> :
+            trips.length === 0 ? <Text style={{ color: colors.textSecondary, marginTop: 12 }}>No trips scheduled for this agency yet.</Text> :
+            trips.map((trip) => (
+              <View key={trip.id} style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 12 }}>
+                <Text style={styles.cardTitle}>{trip.route_from} → {trip.route_to}</Text>
+                <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{trip.travel_date} · {trip.departure_time || 'Time TBC'}</Text>
+                <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{Number(trip.price || 0).toLocaleString()} RWF · {trip.total_seats} total seats · {trip.available_seats} available</Text>
+                <Text style={{ color: trip.status === 'scheduled' ? colors.primary : colors.muted, marginTop: 4, fontWeight: '700' }}>{trip.status}</Text>
+              </View>
+            ))
+          }
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
 function ReportsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
