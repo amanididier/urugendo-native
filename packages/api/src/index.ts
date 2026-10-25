@@ -12,12 +12,12 @@ export type TripRecord = {
   branchId?: string | null;
 };
 export type BookingRecord = {
-  id: string; code: string; tripId: string; status: string; paymentStatus: string;
+  id: string; code: string; tripId: string; status: string; paymentStatus: string; passengerCount: number; paymentMessage?: string;
   passengerName: string; passengerPhone: string; seatLabel: string; totalAmount: number;
   createdAt: string; trip?: TripRecord | null;
 };
 export type CreateBookingInput = {
-  trip: TripRecord; seatLabel: string; passengerName: string; passengerPhone: string;
+  trip: TripRecord; passengerCount: number; passengerName: string; passengerPhone: string;
   momoName?: string; momoNumber: string; bookingCode?: string;
 };
 export class ApiError extends Error {
@@ -44,7 +44,7 @@ const mapBooking = (row: any): BookingRecord => ({
   id: row.id, code: row.booking_code || row.short_code || '', tripId: row.trip_id,
   status: row.status || 'pending', paymentStatus: row.payment_status || 'unpaid',
   passengerName: row.passenger_name || '', passengerPhone: row.passenger_phone || '',
-  seatLabel: row.seat_label || '', totalAmount: Number(row.total_amount ?? row.fare_amount ?? 0),
+  seatLabel: row.seat_label || '', passengerCount: Number(row.passenger_count ?? 1), totalAmount: Number(row.total_amount ?? row.fare_amount ?? 0),
   createdAt: row.created_at || row.booking_date || '', trip: row.trip ? mapTrip(row.trip) : null,
 });
 
@@ -83,7 +83,24 @@ export async function fetchTrips(client: SupabaseClient, filters: { from?: strin
   if (filters.date) query = query.eq('travel_date', filters.date);
   const { data, error } = await query;
   if (error) throw new ApiError(`Could not load trips: ${error.message}`, error.code);
-  return (data || []).filter((row: any) => !['cancelled', 'departed', 'arrived'].includes(row.status)).map(mapTrip);
+  const rows = (data || []).filter((row: any) => !['cancelled', 'departed', 'arrived'].includes(row.status));
+  if (!rows.length) return [];
+  // Capacity is based on the manager-entered total_seats minus active booking passenger counts.
+  // Do not rely on potentially stale available_seats values maintained by older PWA flows.
+  const { data: reservations, error: reservationError } = await client.from('bookings')
+    .select('trip_id, passenger_count, status')
+    .in('trip_id', rows.map((row: any) => row.id))
+    .not('status', 'in', '("rejected","cancelled","expired","past")');
+  if (reservationError) throw new ApiError(`Could not calculate seat availability: ${reservationError.message}`, reservationError.code);
+  const used = new Map<string, number>();
+  for (const booking of reservations || []) {
+    used.set(booking.trip_id, (used.get(booking.trip_id) || 0) + Math.max(1, Number(booking.passenger_count || 1)));
+  }
+  return rows.map((row: any) => {
+    const trip = mapTrip(row);
+    const capacity = Math.max(0, trip.totalSeats - (used.get(trip.id) || 0));
+    return { ...trip, availableSeats: capacity };
+  });
 }
 export async function fetchPassengerBookings(client: SupabaseClient): Promise<BookingRecord[]> {
   const user = await getCurrentUser(client);
@@ -98,23 +115,40 @@ export async function createPassengerBooking(client: SupabaseClient, input: Crea
   if (!user) throw new ApiError('Sign in before booking a trip.', 'SIGN_IN_REQUIRED');
   const passengerName = required(input.passengerName, 'Passenger name');
   const passengerPhone = required(input.passengerPhone, 'Passenger phone');
-  const seatLabel = required(input.seatLabel, 'Seat');
   const momoNumber = required(input.momoNumber, 'MoMo number');
-  if (input.trip.availableSeats <= 0) throw new ApiError('This trip has no available seats.', 'SOLD_OUT');
+  const passengerCount = Math.floor(Number(input.passengerCount));
+  if (!Number.isInteger(passengerCount) || passengerCount < 1 || passengerCount > 50) {
+    throw new ApiError('Passenger count must be between 1 and 50.', 'VALIDATION');
+  }
+  if (input.trip.availableSeats < passengerCount) {
+    throw new ApiError(`Only ${input.trip.availableSeats} seats remain for this trip.`, 'SOLD_OUT');
+  }
   const code = input.bookingCode || makeBookingCode();
-  const payload: Record<string, unknown> = {
-    trip_id: input.trip.id, seat_id: null, seat_label: seatLabel, passenger_name: passengerName,
-    passenger_phone: passengerPhone, booking_code: code, short_code: code,
-    fare_amount: input.trip.price, total_amount: input.trip.price, booking_fee: 0,
-    payment_method: 'MTN MoMo', user_id: user.id, branch_id: input.trip.branchId || null,
-    agency_branch: input.trip.from || null, status: 'payment_submitted',
-    booking_date: new Date().toISOString().slice(0, 10), momo_name: input.momoName?.trim() || null,
-    momo_number: momoNumber, payment_status: 'submitted',
-  };
-  const { data, error } = await client.from('bookings').insert(payload).select('id, trip_id, booking_code, short_code, status, payment_status, passenger_name, passenger_phone, seat_label, total_amount, fare_amount, created_at, booking_date').single();
+  const { data, error } = await client.rpc('create_passenger_booking', {
+    p_trip_id: input.trip.id,
+    p_passenger_name: passengerName,
+    p_passenger_phone: passengerPhone,
+    p_passenger_count: passengerCount,
+    p_total_amount: Math.round(input.trip.price * passengerCount),
+    p_momo_name: input.momoName?.trim() || '',
+    p_momo_number: momoNumber,
+    p_booking_code: code,
+  });
   if (error) {
-    if (error.code === '23505') throw new ApiError('That seat has just been booked. Choose another seat.', error.code);
+    if (error.code === 'P0001') throw new ApiError(error.message || 'There are not enough seats remaining.', 'SOLD_OUT');
+    if (error.code === '42883') throw new ApiError('The capacity-booking database migration has not been applied yet. Please contact support before retrying.', 'MIGRATION_REQUIRED');
     throw new ApiError(`Booking could not be saved: ${error.message}`, error.code);
   }
-  return mapBooking(data);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new ApiError('The database did not return the saved booking.', 'EMPTY_BOOKING');
+  let booking = mapBooking(row);
+  // Initiate the real MTN sandbox request only after the atomic capacity reservation succeeds.
+  const { data: paymentData, error: paymentError } = await client.functions.invoke('mtn-payment', {
+    body: { bookingId: booking.id, amount: booking.totalAmount, phone: momoNumber, currency: 'RWF' },
+  });
+  if (paymentError || paymentData?.error) {
+    booking = { ...booking, paymentMessage: paymentError?.message || paymentData?.error || 'MTN payment request could not be started.' };
+    return booking;
+  }
+  return { ...booking, paymentMessage: paymentData?.message || 'MTN payment request submitted. Approve the prompt on your phone.' };
 }
