@@ -36,7 +36,7 @@ export default function App() {
   const [createdBooking, setCreatedBooking] = useState(null);
   const [passengerName, setPassengerName] = useState('');
   const [passengerPhone, setPassengerPhone] = useState('');
-  const [seatLabel, setSeatLabel] = useState('');
+  const [passengerCount, setPassengerCount] = useState('1');
   const [momoName, setMomoName] = useState('');
   const [momoNumber, setMomoNumber] = useState('');
 
@@ -102,7 +102,7 @@ export default function App() {
     setBusy(true); setError('');
     try {
       const booking = await createPassengerBooking(supabase, {
-        trip: selectedTrip, seatLabel, passengerName, passengerPhone, momoName, momoNumber,
+        trip: selectedTrip, passengerCount: Number(passengerCount), passengerName, passengerPhone, momoName, momoNumber,
       });
       setCreatedBooking(booking);
       setScreen('ticket');
@@ -149,13 +149,13 @@ export default function App() {
           onBack={() => { setScreen('main'); setError(''); }}
           onSelect={(trip) => {
             setSelectedTrip(trip); setPassengerName(profileName);
-            setSeatLabel(''); setMomoName(''); setMomoNumber(''); setScreen('payment'); setError('');
+            setPassengerCount('1'); setMomoName(''); setMomoNumber(''); setScreen('payment'); setError('');
           }} />
       ) : screen === 'payment' && selectedTrip ? (
         <PaymentScreen trip={selectedTrip} busy={busy} error={error} user={user}
           passengerName={passengerName} setPassengerName={setPassengerName}
           passengerPhone={passengerPhone} setPassengerPhone={setPassengerPhone}
-          seatLabel={seatLabel} setSeatLabel={setSeatLabel}
+          passengerCount={passengerCount} setPassengerCount={setPassengerCount}
           momoName={momoName} setMomoName={setMomoName}
           momoNumber={momoNumber} setMomoNumber={setMomoNumber}
           onBack={() => setScreen('search')} onLogin={() => setScreen('login')} onSubmit={submitBooking} />
@@ -232,7 +232,7 @@ function SearchScreen({ trips, busy, error, from, to, date, onBack, onSelect }) 
   );
 }
 
-function PaymentScreen({ trip, busy, error, user, passengerName, setPassengerName, passengerPhone, setPassengerPhone, seatLabel, setSeatLabel, momoName, setMomoName, momoNumber, setMomoNumber, onBack, onLogin, onSubmit }) {
+function PaymentScreen({ trip, busy, error, user, passengerName, setPassengerName, passengerPhone, setPassengerPhone, passengerCount, setPassengerCount, momoName, setMomoName, momoNumber, setMomoNumber, onBack, onLogin, onSubmit }) {
   return (
     <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <PageHeader title="Booking details" subtitle={`${trip.from} → ${trip.to}`} onBack={onBack} />
@@ -241,17 +241,19 @@ function PaymentScreen({ trip, busy, error, user, passengerName, setPassengerNam
           <Text style={styles.cardTitle}>{trip.operatorName}</Text>
           <Text style={styles.muted}>{trip.date} · {trip.departureTime} – {trip.arrivalTime || 'TBC'}</Text>
           <Text style={styles.priceLarge}>{money(trip.price)}</Text>
+          <Text style={styles.muted}>{trip.availableSeats} seats currently available · capacity set by the agency manager</Text>
         </View>
         {!user && <View style={styles.noteCard}><Text style={styles.noteTitle}>Sign in required</Text><Text style={styles.muted}>Sign in to attach this booking securely to your account.</Text><PrimaryButton title="Sign in" onPress={onLogin} /></View>}
         <View style={styles.card}>
           <Field label="PASSENGER FULL NAME" value={passengerName} onChangeText={setPassengerName} placeholder="Full name" />
           <Field label="PASSENGER PHONE" value={passengerPhone} onChangeText={setPassengerPhone} placeholder="078… / +250…" keyboardType="phone-pad" />
-          <Field label="SEAT LABEL" value={seatLabel} onChangeText={setSeatLabel} placeholder="Choose the seat agreed with the agency" />
+          <Field label="NUMBER OF PASSENGERS" value={passengerCount} onChangeText={(v) => setPassengerCount(v.replace(/[^0-9]/g, '').slice(0, 2))} placeholder="1" keyboardType="number-pad" />
+          <Text style={styles.muted}>Total: {money(trip.price * Math.max(1, Number(passengerCount) || 1))} for {Math.max(1, Number(passengerCount) || 1)} passenger(s).</Text>
           <Field label="MOMO ACCOUNT NAME" value={momoName} onChangeText={setMomoName} placeholder="Name on MoMo account" />
           <Field label="MOMO PHONE NUMBER" value={momoNumber} onChangeText={setMomoNumber} placeholder="078… / +250…" keyboardType="phone-pad" />
           {!!error && <Text style={styles.errorText}>{error}</Text>}
-          <Text style={styles.disclaimer}>Submitting records your booking and marks payment as submitted for agency verification. This app does not initiate or confirm an MTN MoMo transaction yet.</Text>
-          <PrimaryButton title={busy ? 'Saving booking…' : 'Submit booking for verification'} onPress={onSubmit} disabled={busy || !user} />
+          <Text style={styles.disclaimer}>Your booking reserves the requested number of seats against the manager's scheduled capacity. The app will request an MTN MoMo sandbox payment; approval and provider confirmation are separate from saving the booking.</Text>
+          <PrimaryButton title={busy ? 'Saving booking…' : 'Reserve seats & request MTN payment'} onPress={onSubmit} disabled={busy || !user || !Number(passengerCount) || Number(passengerCount) > trip.availableSeats} />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -264,14 +266,15 @@ function TicketScreen({ booking, trip, onDone }) {
       <ScrollView contentContainerStyle={styles.centerContent}>
         <Text style={{ fontSize: 54 }}>🎫</Text>
         <Text style={styles.heroDark}>Booking saved</Text>
-        <Text style={styles.muted}>Your booking was written to Urugendo. Payment is not yet verified.</Text>
+        <Text style={styles.muted}>Your booking was written to Urugendo. Payment status must be confirmed by MTN or the agency.</Text>
         <View style={[styles.card, { width: '100%' }]}>
           <Text style={styles.inputLabel}>BOOKING CODE</Text><Text style={styles.code}>{booking.code || booking.id}</Text>
           <Text style={styles.cardTitle}>{trip?.from} → {trip?.to}</Text>
           <Text style={styles.muted}>{trip?.date} · {trip?.departureTime}</Text>
-          <Text style={styles.muted}>Seat: {booking.seatLabel}</Text>
+          <Text style={styles.muted}>Passengers: {booking.passengerCount}</Text>
           <Text style={styles.price}>{money(booking.totalAmount)}</Text>
-          <Text style={styles.statusPill}>Payment submitted · Awaiting agency verification</Text>
+          <Text style={styles.statusPill}>{booking.paymentStatus === 'verified' || booking.paymentStatus === 'success' ? 'Payment confirmed' : 'Payment pending'}</Text>
+          {!!booking.paymentMessage && <Text style={styles.disclaimer}>{booking.paymentMessage}</Text>
         </View>
         <PrimaryButton title="View My Tickets" onPress={onDone} />
       </ScrollView>
