@@ -30,10 +30,12 @@ Requirements: Node.js 20+ and the Expo Go app installed on your Android or iPhon
 npm install
 
 # Start Passenger app and create a tunnel QR for your phone
-npm run passenger -- --tunnel
+cd apps/passenger
+npx expo start --tunnel
 
 # In a second terminal, start the Agency app
-npm run agency -- --tunnel
+cd apps/agency
+npx expo start --tunnel
 ```
 
 Open Expo Go on your phone and scan the QR code. If Metro asks to install compatible Expo packages, use the versions recommended by the installed Expo SDK and restart the server.
