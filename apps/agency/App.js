@@ -31,12 +31,30 @@ export default function App() {
   const [segment, setSegment] = useState('today');
   const [managerTab, setManagerTab] = useState('home');
   const [managerProfile, setManagerProfile] = useState(null);
+  const [managerSessionToken, setManagerSessionToken] = useState(null);
   const [authBusy, setAuthBusy] = useState(false);
 
-  const authenticateAgencyUser = async (email, password, expectedRole) => {
+  const authenticateAgencyUser = async (email, password, expectedRole, managerCode = '', agencyName = '') => {
     if (!email?.trim() || !password) { Alert.alert('Sign in required', 'Enter your email and password.'); return; }
     setAuthBusy(true);
     try {
+      if (expectedRole === 'manager') {
+        if (!managerCode.trim() || !agencyName.trim()) {
+          throw new Error('Enter the manager code and choose the agency assigned to your manager account.');
+        }
+        const { data, error } = await supabase.functions.invoke('manager-auth', {
+          body: { email: email.trim().toLowerCase(), managerCode: managerCode.trim(), password, agencyName: agencyName.trim(), native: true },
+        });
+        if (error) throw new Error(error.message || 'Manager sign-in failed.');
+        if (!data?.ok || !data?.manager || !data?.sessionToken) {
+          const reasons = { not_found: 'Manager account not found.', inactive: 'This manager account is inactive.', code_mismatch: 'Manager code is incorrect.', agency_mismatch: 'The selected agency does not match this manager account.', bad_password: 'Password is incorrect.' };
+          throw new Error(reasons[data?.reason] || 'Manager sign-in failed.');
+        }
+        setManagerProfile(data.manager);
+        setManagerSessionToken(data.sessionToken);
+        setRole('manager'); setManagerTab('home'); setTab('dashboard');
+        return;
+      }
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
       if (error || !data.user) throw error || new Error('Sign in failed.');
       const { data: profile, error: profileError } = await supabase.from('profiles')
@@ -44,25 +62,26 @@ export default function App() {
         .eq('id', data.user.id).maybeSingle();
       if (profileError) throw profileError;
       const roleName = String(profile?.role || '').toLowerCase();
-      const managerRoles = ['manager', 'branch_manager', 'boss', 'agency_boss'];
-      const agentRoles = ['agent', 'checker', 'ticket_checker'];
-      const allowed = expectedRole === 'manager' ? managerRoles.includes(roleName) : agentRoles.includes(roleName);
-      if (!allowed) {
+      if (!['agent', 'checker', 'ticket_checker'].includes(roleName)) {
         await supabase.auth.signOut();
-        throw new Error(expectedRole === 'manager'
-          ? 'This account is not assigned a Branch Manager or Agency Boss role.'
-          : 'This account is not assigned an Agent or Ticket Checker role.');
+        throw new Error('This account is not assigned an Agent or Ticket Checker role.');
       }
       setManagerProfile(profile);
-      setRole(managerRoles.includes(roleName) ? 'manager' : 'agent');
-      setManagerTab('home'); setTab('dashboard');
+      setRole('agent'); setManagerTab('home'); setTab('dashboard');
     } catch (e) {
       Alert.alert('Unable to sign in', e?.message || 'Check your account and try again.');
     } finally { setAuthBusy(false); }
   };
 
+  const logoutManager = async () => {
+    if (managerSessionToken) {
+      try { await supabase.functions.invoke('manager-schedule', { body: { action: 'logout', sessionToken: managerSessionToken } }); } catch {}
+    }
+    setManagerSessionToken(null); setManagerProfile(null); setRole(null); setManagerTab('home');
+  };
+
   if (!role) {
-    return <AgencyLoginScreen busy={authBusy} onAgentLogin={(email, password) => authenticateAgencyUser(email, password, 'agent')} onManagerLogin={(email, password) => authenticateAgencyUser(email, password, 'manager')} />;
+    return <AgencyLoginScreen busy={authBusy} onAgentLogin={(email, password) => authenticateAgencyUser(email, password, 'agent')} onManagerLogin={(email, password, code, agency) => authenticateAgencyUser(email, password, 'manager', code, agency)} />;
   }
 
   if (role === 'manager') {
@@ -71,9 +90,9 @@ export default function App() {
         <StatusBar style="dark" />
         {managerTab === 'home' && <ManagerHomeScreen />}
         {managerTab === 'branches' && <ManagerBranchesScreen />}
-        {managerTab === 'schedule' && <ManagerScheduleScreen profile={managerProfile} />}
+        {managerTab === 'schedule' && <ManagerScheduleScreen profile={managerProfile} sessionToken={managerSessionToken} />}
         {managerTab === 'profile' && (
-          <ManagerProfileScreen onLogout={async () => { await supabase.auth.signOut(); setManagerProfile(null); setRole(null); setManagerTab('home'); }} />
+          <ManagerProfileScreen onLogout={logoutManager} />
         )}
         <View style={styles.bottomNav}>
           <NavItem icon="📊" label="Home" active={managerTab === 'home'} onPress={() => setManagerTab('home')} />
@@ -116,35 +135,28 @@ function NavItem({ icon, label, active, onPress }) {
 function AgencyLoginScreen({ busy, onAgentLogin, onManagerLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [managerCode, setManagerCode] = useState('');
+  const [agencyName, setAgencyName] = useState('Virunga Express');
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <View style={styles.loginHeader}>
-        <SafeAreaView style={{ alignItems: 'center' }}>
-          <Text style={{ fontSize: 48, marginBottom: 8 }}>🏢</Text>
-          <Text style={styles.loginHeaderTitle}>Agency Sign In</Text>
-          <Text style={styles.loginHeaderSub}>Sign in with your approved agency account. Access depends on your assigned role.</Text>
-        </SafeAreaView>
-      </View>
+      <View style={styles.loginHeader}><SafeAreaView style={{ alignItems: 'center' }}><Text style={{ fontSize: 48, marginBottom: 8 }}>🏢</Text><Text style={styles.loginHeaderTitle}>Agency Sign In</Text><Text style={styles.loginHeaderSub}>Approved agency accounts only. Scheduling is reserved for Branch Managers.</Text></SafeAreaView></View>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
         <Text style={styles.inputLabel}>Email Address</Text>
         <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="you@agency.rw" placeholderTextColor={colors.muted} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
         <Text style={styles.inputLabel}>Password</Text>
         <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Your password" placeholderTextColor={colors.muted} secureTextEntry autoCapitalize="none" />
-        <TouchableOpacity style={[styles.primaryBtn, busy && { opacity: 0.6 }]} disabled={busy} onPress={() => onAgentLogin(email, password)} activeOpacity={0.85}>
-          <Text style={styles.primaryBtnText}>{busy ? 'Signing in…' : 'Sign in as Agent / Checker →'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, { marginTop: 12 }]} disabled={busy} onPress={() => onManagerLogin(email, password)}>
-          <Text style={styles.actionBtnText}>Sign in as Branch Manager / Boss</Text>
-        </TouchableOpacity>
-        <Text style={{ textAlign: 'center', marginTop: 16, color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>
-          Only authenticated accounts with the matching role can access operational screens. Contact your agency administrator if your role is incorrect.
-        </Text>
+        <View style={[styles.card, { marginTop: 18 }]}><Text style={styles.cardTitle}>Branch Manager / Agency Boss</Text>
+          <Text style={styles.inputLabel}>Manager Code</Text><TextInput style={styles.input} value={managerCode} onChangeText={setManagerCode} placeholder="Your manager code" placeholderTextColor={colors.muted} autoCapitalize="characters" />
+          <Text style={styles.inputLabel}>Agency Name</Text><TextInput style={styles.input} value={agencyName} onChangeText={setAgencyName} placeholder="Fasta or Virunga Express" placeholderTextColor={colors.muted} autoCapitalize="words" />
+          <TouchableOpacity style={[styles.primaryBtn, busy && { opacity: 0.6 }]} disabled={busy} onPress={() => onManagerLogin(email, password, managerCode, agencyName)}><Text style={styles.primaryBtnText}>{busy ? 'Signing in…' : 'Sign in as Manager →'}</Text></TouchableOpacity>
+        </View>
+        <TouchableOpacity style={[styles.actionBtn, { marginTop: 10 }]} disabled={busy} onPress={() => onAgentLogin(email, password)}><Text style={styles.actionBtnText}>{busy ? 'Signing in…' : 'Sign in as Agent / Checker'}</Text></TouchableOpacity>
+        <Text style={{ textAlign: 'center', marginTop: 16, color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>Your role is checked on the server. Agents cannot access manager scheduling.</Text>
       </ScrollView>
     </View>
   );
 }
-
 function DashboardScreen({ segment, setSegment }) {
   return (
     <View style={{ flex: 1 }}>
@@ -238,7 +250,7 @@ function ScheduleScreen() {
   );
 }
 
-function ManagerScheduleScreen({ profile }) {
+function ManagerScheduleScreen({ profile, sessionToken }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -248,96 +260,52 @@ function ManagerScheduleScreen({ profile }) {
   const [departure, setDeparture] = useState('08:00');
   const [fare, setFare] = useState('');
   const [capacity, setCapacity] = useState('29');
-
   const loadTrips = async () => {
     setLoading(true);
     try {
-      let query = supabase.from('trips')
-        .select('id, route_from, route_to, travel_date, departure_time, price, total_seats, available_seats, status')
-        .order('travel_date', { ascending: true }).limit(100);
-      if (profile?.operator_id) query = query.eq('operator_id', profile.operator_id);
-      const { data, error } = await query;
+      if (!sessionToken) throw new Error('Manager session is missing. Sign in again.');
+      const { data, error } = await supabase.functions.invoke('manager-schedule', { body: { action: 'list', sessionToken } });
       if (error) throw error;
-      setTrips(data || []);
+      if (data?.error) throw new Error(data.error);
+      setTrips(data?.trips || []);
     } catch (e) { Alert.alert('Schedule unavailable', e?.message || 'Could not load trips.'); }
     finally { setLoading(false); }
   };
-
-  useEffect(() => { loadTrips(); }, [profile?.operator_id]);
-
+  useEffect(() => { loadTrips(); }, [sessionToken]);
   const createTrip = async () => {
-    const totalSeats = Number(capacity);
-    const price = Number(fare);
-    if (!from.trim() || !to.trim() || !date || !departure || !Number.isInteger(totalSeats) || totalSeats < 1 || totalSeats > 100 || !Number.isFinite(price) || price <= 0) {
-      Alert.alert('Check trip details', 'Enter origin, destination, date, departure time, a positive fare, and capacity from 1 to 100.');
-      return;
-    }
+    const totalSeats = Number(capacity); const price = Number(fare);
+    if (!from.trim() || !to.trim() || !date || !departure || !Number.isInteger(totalSeats) || totalSeats < 1 || totalSeats > 100 || !Number.isFinite(price) || price <= 0) { Alert.alert('Check trip details', 'Enter origin, destination, date, departure time, a positive fare, and capacity from 1 to 100.'); return; }
     setSaving(true);
     try {
-      const payload = {
-        route_from: from.trim(), route_to: to.trim(), travel_date: date,
-        date, departure_time: departure, price, total_seats: totalSeats,
-        available_seats: totalSeats, status: 'scheduled',
-        operator_id: profile?.operator_id || null,
-        origin_branch: profile?.branch || null,
-      };
-      const { error } = await supabase.from('trips').insert(payload);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('manager-schedule', { body: { action: 'create', sessionToken, trip: { from: from.trim(), to: to.trim(), date, departureTime: departure, price, totalSeats } } });
+      if (error) throw error; if (data?.error) throw new Error(data.error);
       setFrom(''); setTo(''); setFare(''); setCapacity('29');
-      Alert.alert('Trip scheduled', 'The trip is saved. Passengers will see availability based on this capacity.');
+      Alert.alert('Trip scheduled', 'The trip is saved. Passenger availability will follow the manager-entered capacity.');
       await loadTrips();
-    } catch (e) {
-      Alert.alert('Could not save trip', e?.message || 'The schedule could not be saved. Confirm your manager access and database policies.');
-    } finally { setSaving(false); }
+    } catch (e) { Alert.alert('Could not save trip', e?.message || 'Confirm the manager account and trip details.'); }
+    finally { setSaving(false); }
   };
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SafeAreaView style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Manager · Trip Schedule</Text>
-        <Text style={{ color: colors.textSecondary, marginTop: 4 }}>Set capacity for passenger bookings</Text>
-      </SafeAreaView>
+      <SafeAreaView style={styles.pageHeader}><Text style={styles.pageTitle}>Manager · Trip Schedule</Text><Text style={{ color: colors.textSecondary, marginTop: 4 }}>{profile?.agencyName || 'Agency'} · Set passenger capacity</Text></SafeAreaView>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Create a trip</Text>
-          <Text style={styles.inputLabel}>FROM</Text>
-          <TextInput style={styles.input} value={from} onChangeText={setFrom} placeholder="e.g. Kigali" placeholderTextColor={colors.muted} />
-          <Text style={styles.inputLabel}>TO</Text>
-          <TextInput style={styles.input} value={to} onChangeText={setTo} placeholder="e.g. Musanze" placeholderTextColor={colors.muted} />
-          <Text style={styles.inputLabel}>TRAVEL DATE (YYYY-MM-DD)</Text>
-          <TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="2026-11-01" placeholderTextColor={colors.muted} />
-          <Text style={styles.inputLabel}>DEPARTURE TIME (24H)</Text>
-          <TextInput style={styles.input} value={departure} onChangeText={setDeparture} placeholder="08:00" placeholderTextColor={colors.muted} />
-          <Text style={styles.inputLabel}>FARE PER PASSENGER (RWF)</Text>
-          <TextInput style={styles.input} value={fare} onChangeText={setFare} placeholder="e.g. 2500" placeholderTextColor={colors.muted} keyboardType="number-pad" />
-          <Text style={styles.inputLabel}>TOTAL SEAT CAPACITY</Text>
-          <TextInput style={styles.input} value={capacity} onChangeText={setCapacity} placeholder="29" placeholderTextColor={colors.muted} keyboardType="number-pad" />
-          <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8, lineHeight: 18 }}>Passengers do not select seats. The system reserves the number of passengers against this total capacity.</Text>
-          <TouchableOpacity style={[styles.primaryBtn, saving && { opacity: 0.6 }]} onPress={createTrip} disabled={saving}>
-            <Text style={styles.primaryBtnText}>{saving ? 'Saving schedule…' : '+ Save trip schedule'}</Text>
-          </TouchableOpacity>
+        <View style={styles.card}><Text style={styles.cardTitle}>Create a trip</Text>
+          <Text style={styles.inputLabel}>FROM</Text><TextInput style={styles.input} value={from} onChangeText={setFrom} placeholder="e.g. Kigali" placeholderTextColor={colors.muted} />
+          <Text style={styles.inputLabel}>TO</Text><TextInput style={styles.input} value={to} onChangeText={setTo} placeholder="e.g. Musanze" placeholderTextColor={colors.muted} />
+          <Text style={styles.inputLabel}>TRAVEL DATE (YYYY-MM-DD)</Text><TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="2026-11-01" placeholderTextColor={colors.muted} />
+          <Text style={styles.inputLabel}>DEPARTURE TIME (24H)</Text><TextInput style={styles.input} value={departure} onChangeText={setDeparture} placeholder="08:00" placeholderTextColor={colors.muted} />
+          <Text style={styles.inputLabel}>FARE PER PASSENGER (RWF)</Text><TextInput style={styles.input} value={fare} onChangeText={setFare} placeholder="e.g. 2500" placeholderTextColor={colors.muted} keyboardType="number-pad" />
+          <Text style={styles.inputLabel}>TOTAL SEAT CAPACITY</Text><TextInput style={styles.input} value={capacity} onChangeText={setCapacity} placeholder="29" placeholderTextColor={colors.muted} keyboardType="number-pad" />
+          <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8, lineHeight: 18 }}>Passengers do not select seats. The system reserves passenger counts against this capacity.</Text>
+          <TouchableOpacity style={[styles.primaryBtn, saving && { opacity: 0.6 }]} onPress={createTrip} disabled={saving || !sessionToken}><Text style={styles.primaryBtnText}>{saving ? 'Saving schedule…' : '+ Save trip schedule'}</Text></TouchableOpacity>
         </View>
-        <View style={styles.card}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={styles.cardTitle}>Scheduled trips</Text>
-            <TouchableOpacity onPress={loadTrips}><Text style={{ color: colors.primary, fontWeight: '700' }}>Refresh</Text></TouchableOpacity>
-          </View>
-          {loading ? <Text style={{ color: colors.textSecondary, marginTop: 12 }}>Loading schedules…</Text> :
-            trips.length === 0 ? <Text style={{ color: colors.textSecondary, marginTop: 12 }}>No trips found for this manager account yet.</Text> :
-            trips.map(trip => (
-              <View key={trip.id} style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 12 }}>
-                <Text style={styles.cardTitle}>{trip.route_from} → {trip.route_to}</Text>
-                <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{trip.travel_date} · {trip.departure_time || 'Time TBC'}</Text>
-                <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{Number(trip.price).toLocaleString()} RWF · {trip.total_seats} total seats · {trip.available_seats} cached available</Text>
-                <Text style={{ color: colors.primary, marginTop: 4, fontWeight: '700' }}>Capacity is calculated from active passenger bookings</Text>
-              </View>
-            ))}
+        <View style={styles.card}><View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={styles.cardTitle}>Scheduled trips</Text><TouchableOpacity onPress={loadTrips}><Text style={{ color: colors.primary, fontWeight: '700' }}>Refresh</Text></TouchableOpacity></View>
+          {loading ? <Text style={{ color: colors.textSecondary, marginTop: 12 }}>Loading schedules…</Text> : trips.length === 0 ? <Text style={{ color: colors.textSecondary, marginTop: 12 }}>No trips scheduled yet.</Text> : trips.map(trip => <View key={trip.id} style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 12 }}><Text style={styles.cardTitle}>{trip.route_from} → {trip.route_to}</Text><Text style={{ color: colors.textSecondary, marginTop: 4 }}>{trip.travel_date} · {trip.departure_time || 'Time TBC'}</Text><Text style={{ color: colors.textSecondary, marginTop: 4 }}>{Number(trip.price).toLocaleString()} RWF · {trip.total_seats} total seats</Text><Text style={{ color: colors.primary, marginTop: 4, fontWeight: '700' }}>Live availability is calculated from active bookings</Text></View>)}
         </View>
       </ScrollView>
     </View>
   );
 }
-
 function ReportsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
