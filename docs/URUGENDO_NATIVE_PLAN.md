@@ -114,7 +114,17 @@ urugendo-native/
 
 ---
 
-### 25 Oct 2026 – Session 4 (Passenger backend batch)\n- Added shared API types and operations for passenger auth, trip search, booking creation, and ticket retrieval using the existing PWA schema.\n- Added AsyncStorage-backed Supabase session persistence to the Passenger app.\n- Replaced passenger mock trip search, sign-in, ticket confirmation, and My Tickets with database-backed flows.\n- Booking confirmation is accurately labelled as submitted and awaiting agency verification; no real MoMo charge is claimed.\n- Native repository changes are on branch `feat/passenger-supabase-core`; PWA repository was not modified.\n- Not yet verified: local `npm install`, Expo bundling, and live database end-to-end behavior.\n\n---\n\n## 7. Rules for Every Future Session
+### 25 Oct 2026 – Session 4 (Passenger backend batch)\n- Added shared API types and operations for passenger auth, trip search, booking creation, and ticket retrieval using the existing PWA schema.\n- Added AsyncStorage-backed Supabase session persistence to the Passenger app.\n- Replaced passenger mock trip search, sign-in, ticket confirmation, and My Tickets with database-backed flows.\n- Booking confirmation is accurately labelled as submitted and awaiting agency verification; no real MoMo charge is claimed.\n- Native repository changes are on branch `feat/passenger-supabase-core`; PWA repository was not modified.\n- Not yet verified: local `npm install`, Expo bundling, and live database end-to-end behavior.\n\n---\n\n### 25 Oct 2026 – Session 5 (Capacity bookings and MTN sandbox wiring)
+- Merged PR #1 into main (merge commit 3d354da801b6de3c111dfad08c6a49261e62474a). Future native changes are committed directly to main as requested.
+- Removed the passenger-entered seat label requirement; booking flow now asks for passenger count and displays availability derived from manager-entered trip total_seats minus active booked passenger counts.
+- Added atomic create_passenger_booking RPC migration in the PWA repository. This migration must still be applied to the live Supabase database before native booking creation can pass.
+- Passenger booking now calls the MTN MoMo Edge Function and includes a status-check action. PWA Edge Function source now checks the signed-in user and booking ownership before initiation/status access.
+- Found the PWA's current paymentProvider.ts is still a manual-USSD stub; the MTN Edge Function source exists but sandbox credentials/deployment have not been verified.
+- Not tested live: database migration application, native Expo runtime, MTN sandbox credentials/token, and an end-to-end request-to-pay transaction. Supabase access and MTN sandbox secrets are required to finish those tests.
+- Native agency manager currently has no real schedule screen or DB-backed login; the PWA agency schedule page does accept total seats and stores trip capacity. Native manager schedule/auth remains separate work.
+
+---
+## 7. Rules for Every Future Session
 
 1. Read this file first.
 2. Never edit the original urugendo-bolt repo or live PWA.
