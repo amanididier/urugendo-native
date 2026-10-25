@@ -66,7 +66,7 @@ export async function signUpPassenger(client: SupabaseClient, input: { email: st
   const fullName = required(input.fullName, 'Full name'); const phone = required(input.phone, 'Phone number');
   const { data, error } = await client.auth.signUp({ email, password, options: { data: { full_name: fullName, phone, role: 'passenger' } } });
   if (error) throw new ApiError(error.message, error.name);
-  if (data.user) {
+  if (data.user && data.session) {
     const { error: profileError } = await client.from('profiles').upsert({ id: data.user.id, full_name: fullName, phone, role: 'passenger' }, { onConflict: 'id' });
     if (profileError) throw new ApiError(`Account created, but passenger profile setup failed: ${profileError.message}`, profileError.code);
   }
