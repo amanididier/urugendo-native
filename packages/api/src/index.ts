@@ -26,6 +26,8 @@ export class ApiError extends Error {
 }
 export function normalizeRwandaPhone(phone: string): string {
   const digits = String(phone || '').replace(/\\D/g, '');
+  // MTN's published sandbox test MSISDNs are 46733123450–46733123464.
+  if (/^4673312345[0-9]$/.test(digits) || /^4673312346[0-4]$/.test(digits)) return digits;
   if (digits.startsWith('250') && digits.length === 12 && /^250[7-8]\\d{8}$/.test(digits)) return digits;
   if (digits.startsWith('07') && digits.length === 10) return '250' + digits.slice(1);
   if (digits.startsWith('7') && digits.length === 9) return '250' + digits;
