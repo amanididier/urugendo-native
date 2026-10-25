@@ -152,7 +152,7 @@ urugendo-native/
 - Implemented the requested PWA guest checkout path: no account required, seat map skipped, passenger count submitted, server reserves capacity atomically, and a private token-protected ticket is shown after MTN confirms payment.
 - Added PWA hero actions for “Buy ticket” and “Download app”. Download attempts the PWA install prompt where supported; otherwise it gives device home-screen instructions. Native store links remain placeholders until the apps are published.
 - Added PWA ticket access through a high-entropy token stored as a SHA-256 hash in the database. The token is passed in a URL fragment and moved into session storage so it is not sent to the server in request URLs.
-- Added server-side guest checkout rate limits keyed by hashes of phone number and IP. No raw IP is stored in the rate-limit table.
+- Added server-side guest checkout and manager-login rate limits keyed by hashes of phone number, email and IP. No raw IP, phone number or email is stored in the rate-limit table.
 - Enabled RLS on `public.trips`, removed broad public booking read/insert policies, scoped booking reads/updates to passenger ownership or assigned agency staff, and made payment writes server-only. Branch/operator reads remain public; manager writes require scoped access.
 - Added session-protected `manager-auth` and `manager-schedule` Edge Functions using the existing agency manager records. Manager sessions are random, hashed in the database, expire after 12 hours, and can be revoked on logout.
 - Native agency app now asks for manager email, manager code, password and agency; schedule creation/listing goes through the protected manager API. The Agent role no longer has a Schedule tab.
