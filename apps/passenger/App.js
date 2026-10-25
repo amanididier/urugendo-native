@@ -285,7 +285,7 @@ function TicketScreen({ booking, trip, onDone, checkingPayment, onCheckPayment }
           <Text style={styles.price}>{money(booking.totalAmount)}</Text>
           <Text style={styles.statusPill}>{booking.paymentStatus === 'verified' || booking.paymentStatus === 'success' ? 'Payment confirmed' : 'Payment pending'}</Text>
           {!!booking.paymentMessage && <Text style={styles.disclaimer}>{booking.paymentMessage}</Text>
-          {!!booking.paymentReference && booking.paymentStatus !== 'verified' && <PrimaryButton title={checkingPayment ? 'Checking MTN…' : 'Check MTN payment status'} onPress={onCheckPayment} disabled={checkingPayment} secondary />
+          {!!booking.paymentReference && booking.paymentStatus !== 'verified' && <PrimaryButton title={checkingPayment ? 'Checking MTN…' : 'Check MTN payment status'} onPress={onCheckPayment} disabled={checkingPayment} secondary />}
         </View>
         <PrimaryButton title="View My Tickets" onPress={onDone} />
       </ScrollView>
