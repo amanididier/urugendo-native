@@ -10,6 +10,7 @@ import { supabase } from './src/lib/supabase';
 import {
   ApiError, checkPassengerPaymentStatus, createPassengerBooking, fetchPassengerBookings, fetchTrips,
   getCurrentUser, signInPassenger, signOut, signUpPassenger,
+  signInPassengerWithPhone, signUpPassengerWithPhone, verifyPassengerPhone,
 } from '../../packages/api/src/index';
 
 const C = {
@@ -20,6 +21,7 @@ const C = {
 };
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (amount) => `${Number(amount || 0).toLocaleString()} RWF`;
+WebBrowser.maybeCompleteAuthSession();
 
 export default function App() {
   const [tab, setTab] = useState('home');
@@ -42,6 +44,8 @@ export default function App() {
   const [passengerCount, setPassengerCount] = useState('1');
   const [momoName, setMomoName] = useState('');
   const [momoNumber, setMomoNumber] = useState('');
+  const [pendingPhone, setPendingPhone] = useState('');
+  const [pendingPhoneName, setPendingPhoneName] = useState('');
 
   const refreshUser = useCallback(async () => {
     try {
@@ -113,21 +117,36 @@ export default function App() {
     finally { setBusy(false); }
   };
 
+  const handleGoogleSignIn = async () => {
+    const redirectTo = Linking.createURL('auth/callback');
+    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo, skipBrowserRedirect: true } });
+    if (error) throw error;
+    if (!data?.url) throw new Error('Google sign-in could not be started.');
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type !== 'success' || !result.url) return;
+    const callback = new URL(result.url);
+    const code = callback.searchParams.get('code');
+    if (code) { const response = await supabase.auth.exchangeCodeForSession(code); if (response.error) throw response.error; setUser(response.data.user); setProfileName(response.data.user?.user_metadata?.full_name || ''); }
+    else { const hash = new URLSearchParams(callback.hash.replace(/^#/, '')); const access_token = hash.get('access_token'); const refresh_token = hash.get('refresh_token'); if (!access_token || !refresh_token) throw new Error('Google sign-in did not return a session.'); const response = await supabase.auth.setSession({ access_token, refresh_token }); if (response.error) throw response.error; setUser(response.data.user); setProfileName(response.data.user?.user_metadata?.full_name || ''); }
+    setScreen('main'); setTab('home');
+  };
+
   const handleLogin = async (mode, values) => {
     setBusy(true); setError('');
     try {
-      if (mode === 'signup') {
+      if (mode === 'google') await handleGoogleSignIn();
+      else if (values.method === 'phone' && mode === 'signup') {
+        const result = await signUpPassengerWithPhone(supabase, { phone: values.phone, password: values.password, fullName: values.fullName });
+        if (result.needsPhoneConfirmation) { setPendingPhone(result.phone); setPendingPhoneName(result.fullName); setScreen('verify-phone'); Alert.alert('Verify your phone', 'Enter the SMS code to finish creating your account.'); }
+        else { setUser(result.user); setProfileName(values.fullName); setScreen('main'); setTab('home'); }
+      } else if (values.method === 'phone') {
+        const loggedIn = await signInPassengerWithPhone(supabase, values.phone, values.password); setUser(loggedIn); setProfileName(loggedIn.user_metadata?.full_name || ''); setScreen('main'); setTab('home');
+      } else if (mode === 'signup') {
         const result = await signUpPassenger(supabase, values);
-        if (result.needsEmailConfirmation) {
-          Alert.alert('Check your email', 'Your account was created. Confirm your email, then return here and sign in.');
-          setScreen('login');
-        } else {
-          setUser(result.user); setProfileName(values.fullName); setScreen('main'); setTab('home');
-        }
+        if (result.needsEmailConfirmation) { Alert.alert('Check your email', 'Your account was created. Confirm your email, then return here and sign in.'); setScreen('login'); }
+        else { setUser(result.user); setProfileName(values.fullName); setScreen('main'); setTab('home'); }
       } else {
-        const loggedIn = await signInPassenger(supabase, values.email, values.password);
-        setUser(loggedIn); setProfileName(loggedIn.user_metadata?.full_name || '');
-        setScreen('main'); setTab('home');
+        const loggedIn = await signInPassenger(supabase, values.email, values.password); setUser(loggedIn); setProfileName(loggedIn.user_metadata?.full_name || ''); setScreen('main'); setTab('home');
       }
     } catch (e) { showError(e, 'Authentication failed.'); }
     finally { setBusy(false); }
