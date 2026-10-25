@@ -1,6 +1,6 @@
 # Urugendo Native Apps — Master Plan & Progress Tracker
 
-> **Last updated:** 25 Oct 2026 — Supabase capacity and MTN integration update  
+> **Last updated:** 25 Oct 2026 — guest checkout, role security, and manager scheduling  
 > **Rule:** This file is the single source of truth. Check it at the start of every session.  
 > **Critical constraint:** Preserve the existing PWA experience. Shared backend changes are permitted only when required for native compatibility, reviewed against the live schema, and recorded here. Native app source remains in this repository.  
 > **Native GitHub repo:** https://github.com/amanididier/urugendo-native (all progress is pushed here automatically)
@@ -38,8 +38,8 @@ urugendo-native/
 └── README.md
 ```
 
-- **Backend:** Existing Supabase project is shared. Native-compatible migrations are now applied and tracked.
-- **Existing PWA / GitHub repo:** The existing user-facing experience is preserved; a database migration and MTN Edge Function update were added for compatibility.
+- **Backend:** Existing Supabase project is shared. Native-compatible migrations and scoped security policies are applied and tracked.
+- **Existing PWA / GitHub repo:** Existing passenger-facing experience is being adapted for guest checkout. Server-side guest payment and manager APIs are deployed; public booking table access is removed.
 - **New monorepo:** https://github.com/amanididier/urugendo-native
 
 ---
@@ -146,3 +146,16 @@ urugendo-native/
 - Native repo: https://github.com/amanididier/urugendo-native
 
 **End of plan file.**
+
+
+### 25 Oct 2026 – Session 6 (Guest checkout, access control, and manager scheduling)
+- Implemented the requested PWA guest checkout path: no account required, seat map skipped, passenger count submitted, server reserves capacity atomically, and a private token-protected ticket is shown after MTN confirms payment.
+- Added PWA hero actions for “Buy ticket” and “Download app”. Download attempts the PWA install prompt where supported; otherwise it gives device home-screen instructions. Native store links remain placeholders until the apps are published.
+- Added PWA ticket access through a high-entropy token stored as a SHA-256 hash in the database. The token is passed in a URL fragment and moved into session storage so it is not sent to the server in request URLs.
+- Added server-side guest checkout rate limits keyed by hashes of phone number and IP. No raw IP is stored in the rate-limit table.
+- Enabled RLS on `public.trips`, removed broad public booking read/insert policies, scoped booking reads/updates to passenger ownership or assigned agency staff, and made payment writes server-only. Branch/operator reads remain public; manager writes require scoped access.
+- Added session-protected `manager-auth` and `manager-schedule` Edge Functions using the existing agency manager records. Manager sessions are random, hashed in the database, expire after 12 hours, and can be revoked on logout.
+- Native agency app now asks for manager email, manager code, password and agency; schedule creation/listing goes through the protected manager API. The Agent role no longer has a Schedule tab.
+- Added 15-minute expiry for unpaid pending bookings to release capacity and avoid seats being held forever.
+- Live database checks: migrations applied; guest booking RPC passed a transaction/rollback test for fare calculation, token hash storage, and capacity reservation; security advisor no longer reports `trips` RLS disabled. Remaining warnings include the intentionally security-definer authenticated booking RPC and leaked-password protection disabled.
+- Not yet verified: Expo install/bundle/device run; real authenticated MTN sandbox request-to-pay and status round trip; Google OAuth and SMS provider configuration. Current live trips have no future scheduled departures, so create a future trip from the manager schedule before testing passenger search.
