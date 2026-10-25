@@ -1,4 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
+import QRCode from 'react-native-qrcode-svg';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
@@ -301,29 +302,44 @@ function PaymentScreen({ trip, busy, error, user, passengerName, setPassengerNam
   );
 }
 
+function TicketQr({ booking, size = 180 }) {
+  const status = String(booking?.status || '').toLowerCase();
+  const paid = ['verified', 'success'].includes(String(booking?.paymentStatus || '').toLowerCase());
+  const isUsed = ['boarded', 'used'].includes(status);
+  const isActive = paid && !isUsed && !['cancelled', 'rejected', 'expired'].includes(status);
+  const color = isUsed ? '#9CA3AF' : isActive ? C.primary : '#94A3B8';
+  return (
+    <View style={{ alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginVertical: 14, position: 'relative' }}>
+      <QRCode value={String(booking?.code || booking?.id || 'URUGENDO')} size={size} color={color} backgroundColor="#FFFFFF" ecl="H" />
+      {isUsed && <View style={{ position: 'absolute', width: 42, height: 42, borderRadius: 21, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#FFFFFF' }}><Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '900' }}>✓</Text></View>}
+    </View>
+  );
+}
+
 function TicketScreen({ booking, trip, onDone, checkingPayment, onCheckPayment }) {
+  const paid = booking.paymentStatus === 'verified' || booking.paymentStatus === 'success';
   return (
     <View style={styles.page}>
       <ScrollView contentContainerStyle={styles.centerContent}>
         <Text style={{ fontSize: 54 }}>🎫</Text>
-        <Text style={styles.heroDark}>Booking saved</Text>
-        <Text style={styles.muted}>Your booking was written to Urugendo. Payment status must be confirmed by MTN or the agency.</Text>
+        <Text style={styles.heroDark}>{paid ? 'Your ticket is active' : 'Booking saved'}</Text>
+        <Text style={styles.muted}>{paid ? 'Keep this QR code ready when boarding.' : 'Your ticket becomes active only after MTN or the agency confirms payment.'}</Text>
         <View style={[styles.card, { width: '100%' }]}>
+          <TicketQr booking={booking} />
           <Text style={styles.inputLabel}>BOOKING CODE</Text><Text style={styles.code}>{booking.code || booking.id}</Text>
           <Text style={styles.cardTitle}>{trip?.from} → {trip?.to}</Text>
           <Text style={styles.muted}>{trip?.date} · {trip?.departureTime}</Text>
           <Text style={styles.muted}>Passengers: {booking.passengerCount}</Text>
           <Text style={styles.price}>{money(booking.totalAmount)}</Text>
-          <Text style={styles.statusPill}>{booking.paymentStatus === 'verified' || booking.paymentStatus === 'success' ? 'Payment confirmed' : 'Payment pending'}</Text>
-          {!!booking.paymentMessage && <Text style={styles.disclaimer}>{booking.paymentMessage}</Text>
-          {!!booking.paymentReference && booking.paymentStatus !== 'verified' && <PrimaryButton title={checkingPayment ? 'Checking MTN…' : 'Check MTN payment status'} onPress={onCheckPayment} disabled={checkingPayment} secondary />}
+          <Text style={styles.statusPill}>{paid ? 'Payment confirmed · Active QR' : booking.paymentStatus === 'failed' ? 'Payment failed' : 'Payment pending'}</Text>
+          {!!booking.paymentMessage && <Text style={styles.disclaimer}>{booking.paymentMessage}</Text>}
+          {!!booking.paymentReference && !paid && <PrimaryButton title={checkingPayment ? 'Checking MTN…' : 'Check MTN payment status'} onPress={onCheckPayment} disabled={checkingPayment} secondary />}
         </View>
         <PrimaryButton title="View My Tickets" onPress={onDone} />
       </ScrollView>
     </View>
   );
 }
-
 function TicketsScreen({ tickets, busy, user, onRefresh, onLogin }) {
   return (
     <View style={styles.page}>
@@ -339,6 +355,7 @@ function TicketsScreen({ tickets, busy, user, onRefresh, onLogin }) {
                 <View style={styles.rowBetween}><Text style={styles.cardTitle}>{ticket.trip ? `${ticket.trip.from} → ${ticket.trip.to}` : 'Urugendo booking'}</Text><Text style={styles.price}>{money(ticket.totalAmount)}</Text></View>
                 <Text style={styles.muted}>{ticket.trip?.date || ticket.createdAt}</Text>
                 <Text style={styles.muted}>Code: {ticket.code || ticket.id}</Text>
+                <TicketQr booking={ticket} size={120} />
                 <Text style={styles.statusPill}>{ticket.paymentStatus === 'verified' ? 'Payment verified' : ticket.paymentStatus === 'failed' ? 'Payment failed' : 'Awaiting payment verification'}</Text>
               </View>
             ))}
