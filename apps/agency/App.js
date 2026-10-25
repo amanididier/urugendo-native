@@ -73,7 +73,7 @@ export default function App() {
         {managerTab === 'branches' && <ManagerBranchesScreen />}
         {managerTab === 'schedule' && <ManagerScheduleScreen profile={managerProfile} />}
         {managerTab === 'profile' && (
-          <ManagerProfileScreen onLogout={() => { setRole(null); setManagerTab('home'); }} />
+          <ManagerProfileScreen onLogout={async () => { await supabase.auth.signOut(); setManagerProfile(null); setRole(null); setManagerTab('home'); }} />
         )}
         <View style={styles.bottomNav}>
           <NavItem icon="📊" label="Home" active={managerTab === 'home'} onPress={() => setManagerTab('home')} />
@@ -92,7 +92,7 @@ export default function App() {
       {tab === 'schedule' && <ScheduleScreen />}
       {tab === 'reports' && <ReportsScreen />}
       {tab === 'profile' && (
-        <AgencyProfileScreen onLogout={() => { setRole(null); setTab('dashboard'); }} />
+        <AgencyProfileScreen onLogout={async () => { await supabase.auth.signOut(); setManagerProfile(null); setRole(null); setTab('dashboard'); }} />
       )}
       <View style={styles.bottomNav}>
         <NavItem icon="🚌" label="Dashboard" active={tab === 'dashboard'} onPress={() => setTab('dashboard')} />
