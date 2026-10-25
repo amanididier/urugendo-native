@@ -127,6 +127,16 @@ urugendo-native/
 - PWA source updates are committed directly to `main`: capacity migration and MTN Edge Function source.
 
 ---
+### 25 Oct 2026 – Session 6 (Security and requested flow review)
+- Confirmed the native agency app already renders the Schedule tab only after the Branch Manager / Agency Boss login; the Agent / Ticket Checker navigation does not include Schedule. Keep that role boundary.
+- Confirmed the PWA already has a dedicated guest `/buy` checkout route and a hero-level Buy ticket CTA alongside Download app. The guest flow does not require an account and uses a guest token to access ticket details.
+- Enabled Row Level Security on `public.trips` after inspecting its existing policies. The table has a public SELECT policy for browsing and authenticated manager-only INSERT/UPDATE/DELETE policies scoped to the user's operator.
+- Reviewed the PWA guest checkout and MTN function source. Guest checkout already calculates capacity through an atomic guest booking RPC, hashes guest tokens and rate-limit identifiers, persists a payment reference before contacting MTN, and keeps tickets inactive until server-confirmed payment.
+- **Important production limitation:** MTN sandbox uses simulation/test outcomes and does not prove that a real Rwanda MoMo PIN prompt or production collection is working. Do not ask users for or store their MoMo PIN. Production must only be enabled after MTN confirms the production target environment and credentials.
+- **Still outstanding:** run Expo on a real device; verify phone registration/OTP and email/Gmail auth with project configuration; test sandbox request-to-pay/status outcomes with configured secrets; review guest checkout RPC and payment status path end-to-end; finalize downloadable ticket styling (black QR for downloaded PDF, green active in-app QR/ticket, grey inactive ticket with green check); add actual Play Store/App Store links only after the native apps are published.
+- Native and PWA source work continues directly on `main`, per user request. No feature branches were created.
+
+---
 ## 7. Rules for Every Future Session
 
 1. Read this file first.
