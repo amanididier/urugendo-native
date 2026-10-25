@@ -16,7 +16,7 @@
 | Keep **100% of current UI & UX** | Confirmed |
 | Keep existing **PWA** fully working for testing (no download needed) | Confirmed |
 | Native apps must be publishable to **Google Play + Apple App Store** | Confirmed |
-| Do **not touch** the current codebase / live app | Confirmed |
+| Preserve the existing PWA user experience; shared backend changes must be security-reviewed and documented | Confirmed |
 | Ignore Driver role for now | Confirmed |
 
 ---
@@ -161,3 +161,15 @@ urugendo-native/
 - Added 15-minute expiry for unpaid pending bookings to release capacity and avoid seats being held forever.
 - Live database checks: migrations applied; guest booking RPC passed a transaction/rollback test for fare calculation, token hash storage, and capacity reservation; security advisor no longer reports `trips` RLS disabled. Remaining warnings include the intentionally security-definer authenticated booking RPC and leaked-password protection disabled; enable Supabase Auth leaked-password protection before production.
 - Not yet verified: Expo install/bundle/device run; real authenticated MTN sandbox request-to-pay and status round trip; Google OAuth and SMS provider configuration. Current live trips have no future scheduled departures, so create a future trip from the manager schedule before testing passenger search.
+
+
+### 25 Oct 2026 – Session 7 (Guest purchase, manager scheduling and access hardening)
+- Added a dedicated PWA `/buy` guest checkout page: route/date search, capacity-based trip choice, passenger/MoMo details, Pay Now, MTN status polling, and the “Bika itike yawe” e-ticket handoff. No account is required for this web purchase. The splash hero’s Buy Ticket CTA now opens this flow; the Download App CTA retains device install guidance until native store releases exist.
+- Added a server-side `guest-checkout?action=trips` endpoint that returns trip capacity computed from `total_seats` minus active passenger counts. Public clients do not query booking rows directly for guest availability.
+- Hardened payment initiation: create the payment tracking row before requesting MTN, fail closed if tracking cannot be persisted, and mark the reservation/payment failed on initiation errors. Temporary status-check network errors no longer get presented as confirmed payment failure.
+- Added and deployed `agent-registration` to assign agent profile roles only after authenticated server-side checks. Client profile privileges no longer permit updates to `role`, `operator_id`, or `status`; booking access for agents/checkers requires an approved agency-agent record.
+- Enabled RLS on `public.trips`; removed the unrestricted agent-table policy, public manager credential read, generic seat updates, and broad public notification policy. Security advisors confirm all key public tables now have RLS enabled. Remaining advisor warnings: the intentionally authenticated capacity RPC is SECURITY DEFINER, and Supabase leaked-password protection is disabled.
+- Added a manager-only Schedule tab to both native Agency app and PWA manager dashboard. The agent dashboard no longer exposes schedule creation; its old schedule URL redirects to the manager account. Manager scheduling uses the server-side session-validated `manager-schedule` function and writes the capacity read by passenger checkout.
+- Deployed Edge Functions: `guest-checkout` v8, `mtn-payment` v14, `manager-auth` v4, `manager-schedule` v4, and `agent-registration` v2. Manager sessions are hashed, expire after 12 hours, and are revoked on logout.
+- Verified live DB RLS flags for trips/bookings/payments/profiles/agency_agents/agency_managers/seats/notifications; verified authenticated users cannot update profile role/operator/status, anonymous users cannot call the booking RPCs, and the native capacity RPC remains available only to authenticated users.
+- **Not yet verified:** a real MTN sandbox request-to-pay/status round trip and Expo device/runtime build. The database currently has zero future scheduled trips, so create a future trip using the manager Schedule tab before testing passenger checkout. MTN secret names are present per owner report, but credential validity was not verified by a live provider request.
