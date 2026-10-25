@@ -107,16 +107,12 @@ export default function App() {
   return (
     <View style={styles.root}>
       <StatusBar style={tab === 'dashboard' ? 'light' : 'dark'} />
-      {tab === 'dashboard' && <DashboardScreen segment={segment} setSegment={setSegment} />}
-      {tab === 'schedule' && <ScheduleScreen />}
-      {tab === 'reports' && <ReportsScreen />}
+      {tab === 'dashboard' && <DashboardScreen segment={segment} setSegment={setSegment} />}      {tab === 'reports' && <ReportsScreen />}
       {tab === 'profile' && (
         <AgencyProfileScreen onLogout={async () => { await supabase.auth.signOut(); setManagerProfile(null); setRole(null); setTab('dashboard'); }} />
       )}
       <View style={styles.bottomNav}>
-        <NavItem icon="🚌" label="Dashboard" active={tab === 'dashboard'} onPress={() => setTab('dashboard')} />
-        <NavItem icon="📅" label="Schedule" active={tab === 'schedule'} onPress={() => setTab('schedule')} />
-        <NavItem icon="📄" label="Reports" active={tab === 'reports'} onPress={() => setTab('reports')} />
+        <NavItem icon="🚌" label="Dashboard" active={tab === 'dashboard'} onPress={() => setTab('dashboard')} />        <NavItem icon="📄" label="Reports" active={tab === 'reports'} onPress={() => setTab('reports')} />
         <NavItem icon="⚙️" label="Profile" active={tab === 'profile'} onPress={() => setTab('profile')} />
       </View>
     </View>
@@ -214,7 +210,7 @@ function DashboardScreen({ segment, setSegment }) {
               </View>
             </View>
             <View style={styles.twoCol}>
-              <TouchableOpacity style={styles.actionBtn}><Text style={styles.actionBtnText}>+  Add Schedule</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn}><Text style={styles.actionBtnText}>🧾  Counter Sales</Text></TouchableOpacity>
               <TouchableOpacity style={styles.actionBtn}><Text style={styles.actionBtnText}>🔍  Verify Ticket</Text></TouchableOpacity>
             </View>
           </>
@@ -238,74 +234,7 @@ function DashboardScreen({ segment, setSegment }) {
   );
 }
 
-function ScheduleScreen() {
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SafeAreaView style={styles.pageHeader}><Text style={styles.pageTitle}>Schedule</Text></SafeAreaView>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-        <TouchableOpacity style={styles.primaryBtn}><Text style={styles.primaryBtnText}>+ Add new trip</Text></TouchableOpacity>
-        <View style={[styles.card, { marginTop: 16 }]}><Text style={{ color: colors.textSecondary, textAlign: 'center' }}>No schedules yet</Text></View>
-      </ScrollView>
-    </View>
-  );
-}
 
-function ManagerScheduleScreen({ profile, sessionToken }) {
-  const [trips, setTrips] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [departure, setDeparture] = useState('08:00');
-  const [fare, setFare] = useState('');
-  const [capacity, setCapacity] = useState('29');
-  const loadTrips = async () => {
-    setLoading(true);
-    try {
-      if (!sessionToken) throw new Error('Manager session is missing. Sign in again.');
-      const { data, error } = await supabase.functions.invoke('manager-schedule', { body: { action: 'list', sessionToken } });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      setTrips(data?.trips || []);
-    } catch (e) { Alert.alert('Schedule unavailable', e?.message || 'Could not load trips.'); }
-    finally { setLoading(false); }
-  };
-  useEffect(() => { loadTrips(); }, [sessionToken]);
-  const createTrip = async () => {
-    const totalSeats = Number(capacity); const price = Number(fare);
-    if (!from.trim() || !to.trim() || !date || !departure || !Number.isInteger(totalSeats) || totalSeats < 1 || totalSeats > 100 || !Number.isFinite(price) || price <= 0) { Alert.alert('Check trip details', 'Enter origin, destination, date, departure time, a positive fare, and capacity from 1 to 100.'); return; }
-    setSaving(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('manager-schedule', { body: { action: 'create', sessionToken, trip: { from: from.trim(), to: to.trim(), date, departureTime: departure, price, totalSeats } } });
-      if (error) throw error; if (data?.error) throw new Error(data.error);
-      setFrom(''); setTo(''); setFare(''); setCapacity('29');
-      Alert.alert('Trip scheduled', 'The trip is saved. Passenger availability will follow the manager-entered capacity.');
-      await loadTrips();
-    } catch (e) { Alert.alert('Could not save trip', e?.message || 'Confirm the manager account and trip details.'); }
-    finally { setSaving(false); }
-  };
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SafeAreaView style={styles.pageHeader}><Text style={styles.pageTitle}>Manager · Trip Schedule</Text><Text style={{ color: colors.textSecondary, marginTop: 4 }}>{profile?.agencyName || 'Agency'} · Set passenger capacity</Text></SafeAreaView>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
-        <View style={styles.card}><Text style={styles.cardTitle}>Create a trip</Text>
-          <Text style={styles.inputLabel}>FROM</Text><TextInput style={styles.input} value={from} onChangeText={setFrom} placeholder="e.g. Kigali" placeholderTextColor={colors.muted} />
-          <Text style={styles.inputLabel}>TO</Text><TextInput style={styles.input} value={to} onChangeText={setTo} placeholder="e.g. Musanze" placeholderTextColor={colors.muted} />
-          <Text style={styles.inputLabel}>TRAVEL DATE (YYYY-MM-DD)</Text><TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="2026-11-01" placeholderTextColor={colors.muted} />
-          <Text style={styles.inputLabel}>DEPARTURE TIME (24H)</Text><TextInput style={styles.input} value={departure} onChangeText={setDeparture} placeholder="08:00" placeholderTextColor={colors.muted} />
-          <Text style={styles.inputLabel}>FARE PER PASSENGER (RWF)</Text><TextInput style={styles.input} value={fare} onChangeText={setFare} placeholder="e.g. 2500" placeholderTextColor={colors.muted} keyboardType="number-pad" />
-          <Text style={styles.inputLabel}>TOTAL SEAT CAPACITY</Text><TextInput style={styles.input} value={capacity} onChangeText={setCapacity} placeholder="29" placeholderTextColor={colors.muted} keyboardType="number-pad" />
-          <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8, lineHeight: 18 }}>Passengers do not select seats. The system reserves passenger counts against this capacity.</Text>
-          <TouchableOpacity style={[styles.primaryBtn, saving && { opacity: 0.6 }]} onPress={createTrip} disabled={saving || !sessionToken}><Text style={styles.primaryBtnText}>{saving ? 'Saving schedule…' : '+ Save trip schedule'}</Text></TouchableOpacity>
-        </View>
-        <View style={styles.card}><View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={styles.cardTitle}>Scheduled trips</Text><TouchableOpacity onPress={loadTrips}><Text style={{ color: colors.primary, fontWeight: '700' }}>Refresh</Text></TouchableOpacity></View>
-          {loading ? <Text style={{ color: colors.textSecondary, marginTop: 12 }}>Loading schedules…</Text> : trips.length === 0 ? <Text style={{ color: colors.textSecondary, marginTop: 12 }}>No trips scheduled yet.</Text> : trips.map(trip => <View key={trip.id} style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, marginTop: 12 }}><Text style={styles.cardTitle}>{trip.route_from} → {trip.route_to}</Text><Text style={{ color: colors.textSecondary, marginTop: 4 }}>{trip.travel_date} · {trip.departure_time || 'Time TBC'}</Text><Text style={{ color: colors.textSecondary, marginTop: 4 }}>{Number(trip.price).toLocaleString()} RWF · {trip.total_seats} total seats</Text><Text style={{ color: colors.primary, marginTop: 4, fontWeight: '700' }}>Live availability is calculated from active bookings</Text></View>)}
-        </View>
-      </ScrollView>
-    </View>
-  );
-}
 function ReportsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
