@@ -12,7 +12,7 @@ export type TripRecord = {
   branchId?: string | null;
 };
 export type BookingRecord = {
-  id: string; code: string; tripId: string; status: string; paymentStatus: string; passengerCount: number; paymentMessage?: string;
+  id: string; code: string; tripId: string; status: string; paymentStatus: string; passengerCount: number; paymentMessage?: string; paymentReference?: string;
   passengerName: string; passengerPhone: string; seatLabel: string; totalAmount: number;
   createdAt: string; trip?: TripRecord | null;
 };
@@ -105,7 +105,7 @@ export async function fetchTrips(client: SupabaseClient, filters: { from?: strin
 export async function fetchPassengerBookings(client: SupabaseClient): Promise<BookingRecord[]> {
   const user = await getCurrentUser(client);
   if (!user) throw new ApiError('Sign in to see your tickets.', 'SIGN_IN_REQUIRED');
-  const { data, error } = await client.from('bookings').select('id, trip_id, booking_code, short_code, status, payment_status, passenger_name, passenger_phone, seat_label, total_amount, fare_amount, created_at, booking_date, trip:trips(id,route_from,route_to,departure_time,arrival_time,duration,travel_date,date,price,currency,total_seats,available_seats,status,plate_number,origin_branch_id,branch_id,operator:operators(id,name))').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100);
+  const { data, error } = await client.from('bookings').select('id, trip_id, booking_code, short_code, status, payment_status, passenger_name, passenger_phone, seat_label, passenger_count, total_amount, fare_amount, created_at, booking_date, trip:trips(id,route_from,route_to,departure_time,arrival_time,duration,travel_date,date,price,currency,total_seats,available_seats,status,plate_number,origin_branch_id,branch_id,operator:operators(id,name))').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100);
   if (error) throw new ApiError(`Could not load tickets: ${error.message}`, error.code);
   return (data || []).map(mapBooking);
 }
@@ -150,5 +150,15 @@ export async function createPassengerBooking(client: SupabaseClient, input: Crea
     booking = { ...booking, paymentMessage: paymentError?.message || paymentData?.error || 'MTN payment request could not be started.' };
     return booking;
   }
-  return { ...booking, paymentMessage: paymentData?.message || 'MTN payment request submitted. Approve the prompt on your phone.' };
+  return { ...booking, paymentReference: paymentData?.referenceId, paymentMessage: paymentData?.message || 'MTN payment request submitted. Approve the prompt on your phone.' };
+}
+
+export async function checkPassengerPaymentStatus(client: SupabaseClient, referenceId: string): Promise<{ status: string; message?: string }> {
+  if (!referenceId) throw new ApiError('No MTN payment reference is available yet.', 'PAYMENT_REFERENCE_MISSING');
+  const user = await getCurrentUser(client);
+  if (!user) throw new ApiError('Sign in to check payment status.', 'SIGN_IN_REQUIRED');
+  const { data, error } = await client.functions.invoke(`mtn-payment?action=status&referenceId=${encodeURIComponent(referenceId)}`, { method: 'GET' });
+  if (error) throw new ApiError(`Could not check MTN payment: ${error.message}`, 'PAYMENT_STATUS_ERROR');
+  if (data?.error) throw new ApiError(data.error, 'PAYMENT_STATUS_ERROR');
+  return { status: data?.status || 'pending', message: data?.message };
 }
