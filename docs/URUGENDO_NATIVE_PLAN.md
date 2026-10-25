@@ -1,8 +1,8 @@
 # Urugendo Native Apps — Master Plan & Progress Tracker
 
-> **Last updated:** 25 Oct 2026  
+> **Last updated:** 25 Oct 2026 — Supabase capacity and MTN integration update  
 > **Rule:** This file is the single source of truth. Check it at the start of every session.  
-> **Critical constraint:** Never modify the existing PWA, the GitHub repo `amanididier/urugendo-bolt`, or any live production system. Native apps are built in complete isolation.  
+> **Critical constraint:** Preserve the existing PWA experience. Shared backend changes are permitted only when required for native compatibility, reviewed against the live schema, and recorded here. Native app source remains in this repository.  
 > **Native GitHub repo:** https://github.com/amanididier/urugendo-native (all progress is pushed here automatically)
 
 ---
@@ -38,8 +38,8 @@ urugendo-native/
 └── README.md
 ```
 
-- **Backend:** Existing Supabase project stays exactly as-is.
-- **Existing PWA / GitHub repo:** Completely untouched.
+- **Backend:** Existing Supabase project is shared. Native-compatible migrations are now applied and tracked.
+- **Existing PWA / GitHub repo:** The existing user-facing experience is preserved; a database migration and MTN Edge Function update were added for compatibility.
 - **New monorepo:** https://github.com/amanididier/urugendo-native
 
 ---
@@ -115,13 +115,16 @@ urugendo-native/
 ---
 
 ### 25 Oct 2026 – Session 4 (Passenger backend batch)\n- Added shared API types and operations for passenger auth, trip search, booking creation, and ticket retrieval using the existing PWA schema.\n- Added AsyncStorage-backed Supabase session persistence to the Passenger app.\n- Replaced passenger mock trip search, sign-in, ticket confirmation, and My Tickets with database-backed flows.\n- Booking confirmation is accurately labelled as submitted and awaiting agency verification; no real MoMo charge is claimed.\n- Native repository changes are on branch `feat/passenger-supabase-core`; PWA repository was not modified.\n- Not yet verified: local `npm install`, Expo bundling, and live database end-to-end behavior.\n\n---\n\n### 25 Oct 2026 – Session 5 (Capacity bookings and MTN sandbox wiring)
-- Merged PR #1 into main (merge commit 3d354da801b6de3c111dfad08c6a49261e62474a). Future native changes are committed directly to main as requested.
-- Removed the passenger-entered seat label requirement; booking flow now asks for passenger count and displays availability derived from manager-entered trip total_seats minus active booked passenger counts.
-- Added atomic create_passenger_booking RPC migration in the PWA repository. This migration must still be applied to the live Supabase database before native booking creation can pass.
-- Passenger booking now calls the MTN MoMo Edge Function and includes a status-check action. PWA Edge Function source now checks the signed-in user and booking ownership before initiation/status access.
-- Found the PWA's current paymentProvider.ts is still a manual-USSD stub; the MTN Edge Function source exists but sandbox credentials/deployment have not been verified.
-- Not tested live: database migration application, native Expo runtime, MTN sandbox credentials/token, and an end-to-end request-to-pay transaction. Supabase access and MTN sandbox secrets are required to finish those tests.
-- Native agency manager currently has no real schedule screen or DB-backed login; the PWA agency schedule page does accept total seats and stores trip capacity. Native manager schedule/auth remains separate work.
+- Merged PR #1 into main (merge commit 3d354da801b6de3c111dfad08c6a49261e62474a). All future changes are committed directly to `main`, as requested.
+- Removed the passenger-entered seat label requirement. The passenger enters passenger count; availability is calculated from manager-entered `trips.total_seats` minus active booking passenger counts.
+- Applied the `capacity_based_native_bookings` database migration to the shared Supabase project. It adds `bookings.passenger_count`, MTN payment-tracking columns, and an atomic capacity-reservation RPC.
+- Applied `enforce_trip_fares_for_native_bookings`: the database calculates the fare from the trip's stored price instead of trusting a client-supplied amount. The RPC is executable by authenticated users only.
+- Verified the booking RPC in a rolled-back database transaction; the test did not leave a booking behind. Verified migration history, columns, function permissions, and the Edge Function deployment.
+- Deployed `mtn-payment` Edge Function version 6. It checks session and booking ownership, uses MTN sandbox EUR €1 test requests (while preserving the actual RWF fare in Urugendo), records provider references, supports payment status checks, and marks bookings failed if initiation fails.
+- **Still not verified:** a real MTN sandbox request-to-pay/status round trip. The Edge Function's MTN credentials and webhook secret are managed as Supabase secrets; their configured state and a live sandbox response were not confirmed by these checks. Do not treat payment as end-to-end tested yet.
+- **Security finding:** Supabase's security advisor reports `public.trips` has RLS disabled even though policies exist. I did not change it automatically because enabling RLS may alter current access; review policies before enabling it.
+- **Still outstanding:** native Expo install/bundle/runtime test; native agency manager schedule/auth screen. The existing PWA manager scheduling page remains the current source for total seat capacity.
+- PWA source updates are committed directly to `main`: capacity migration and MTN Edge Function source.
 
 ---
 ## 7. Rules for Every Future Session
