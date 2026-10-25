@@ -1,0 +1,27 @@
+name: Expo app validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [passenger, agency]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install workspace dependencies
+        run: npm install
+      - name: Bundle Android app
+        working-directory: apps/${{ matrix.app }}
+        run: npx expo export --platform android --output-dir ../../dist/${{ matrix.app }}
