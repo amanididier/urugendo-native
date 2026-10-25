@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { supabase } from './src/lib/supabase';
 import {
-  ApiError, createPassengerBooking, fetchPassengerBookings, fetchTrips,
+  ApiError, checkPassengerPaymentStatus, createPassengerBooking, fetchPassengerBookings, fetchTrips,
   getCurrentUser, signInPassenger, signOut, signUpPassenger,
 } from '../../packages/api/src/index';
 
@@ -26,6 +26,7 @@ export default function App() {
   const [profileName, setProfileName] = useState('');
   const [loadingUser, setLoadingUser] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(false);
   const [error, setError] = useState('');
   const [from, setFrom] = useState('Kigali');
   const [to, setTo] = useState('Musanze');
@@ -160,7 +161,16 @@ export default function App() {
           momoNumber={momoNumber} setMomoNumber={setMomoNumber}
           onBack={() => setScreen('search')} onLogin={() => setScreen('login')} onSubmit={submitBooking} />
       ) : screen === 'ticket' && createdBooking ? (
-        <TicketScreen booking={createdBooking} trip={selectedTrip} onDone={async () => {
+        <TicketScreen booking={createdBooking} trip={selectedTrip} checkingPayment={checkingPayment} onCheckPayment={async () => {
+        if (!createdBooking?.paymentReference) { Alert.alert('Payment status', createdBooking?.paymentMessage || 'No payment reference was returned.'); return; }
+        setCheckingPayment(true);
+        try {
+          const result = await checkPassengerPaymentStatus(supabase, createdBooking.paymentReference);
+          setCreatedBooking(prev => ({ ...prev, paymentStatus: result.status === 'success' ? 'verified' : result.status, paymentMessage: result.status === 'success' ? 'MTN confirmed this payment.' : (result.message || `MTN status: ${result.status}`) }));
+          Alert.alert('MTN payment status', result.status === 'success' ? 'Payment confirmed.' : `Payment status: ${result.status}`);
+        } catch (e) { showError(e, 'Could not check payment status.'); }
+        finally { setCheckingPayment(false); }
+      }} onDone={async () => {
           setScreen('main'); setTab('tickets'); await loadTickets();
         }} />
       ) : (
@@ -260,7 +270,7 @@ function PaymentScreen({ trip, busy, error, user, passengerName, setPassengerNam
   );
 }
 
-function TicketScreen({ booking, trip, onDone }) {
+function TicketScreen({ booking, trip, onDone, checkingPayment, onCheckPayment }) {
   return (
     <View style={styles.page}>
       <ScrollView contentContainerStyle={styles.centerContent}>
@@ -275,6 +285,7 @@ function TicketScreen({ booking, trip, onDone }) {
           <Text style={styles.price}>{money(booking.totalAmount)}</Text>
           <Text style={styles.statusPill}>{booking.paymentStatus === 'verified' || booking.paymentStatus === 'success' ? 'Payment confirmed' : 'Payment pending'}</Text>
           {!!booking.paymentMessage && <Text style={styles.disclaimer}>{booking.paymentMessage}</Text>
+          {!!booking.paymentReference && booking.paymentStatus !== 'verified' && <PrimaryButton title={checkingPayment ? 'Checking MTN…' : 'Check MTN payment status'} onPress={onCheckPayment} disabled={checkingPayment} secondary />
         </View>
         <PrimaryButton title="View My Tickets" onPress={onDone} />
       </ScrollView>
