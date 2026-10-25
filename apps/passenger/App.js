@@ -164,8 +164,18 @@ export default function App() {
       <StatusBar style="dark" />
       {loadingUser ? (
         <View style={styles.center}><ActivityIndicator size="large" color={C.primary} /><Text style={styles.muted}>Restoring your session…</Text></View>
-      ) : screen === 'login' ? (
-        <AuthScreen busy={busy} onBack={() => setScreen('main')} onSubmit={handleLogin} />
+      ) : screen === 'login' || screen === 'verify-phone' ? (
+        <AuthScreen busy={busy} initialMode={screen === 'verify-phone' ? 'verify-phone' : 'signin'} pendingPhone={pendingPhone}
+          onBack={() => setScreen('main')} onSubmit={handleLogin}
+          onVerifyPhone={async (code) => {
+            setBusy(true); setError('');
+            try {
+              const verified = await verifyPassengerPhone(supabase, pendingPhone, code, pendingPhoneName);
+              setUser(verified); setProfileName(pendingPhoneName); setScreen('main'); setTab('home');
+              Alert.alert('Welcome to Urugendo', 'Your phone number is verified and your account is ready.');
+            } catch (e) { showError(e, 'Phone verification failed.'); }
+            finally { setBusy(false); }
+          }} />
       ) : screen === 'search' ? (
         <SearchScreen trips={trips} busy={busy} error={error} from={from} to={to} date={travelDate}
           onBack={() => { setScreen('main'); setError(''); }}
@@ -351,32 +361,52 @@ function ProfileScreen({ user, name, busy, onLogin, onLogout }) {
   );
 }
 
-function AuthScreen({ busy, onBack, onSubmit }) {
-  const [mode, setMode] = useState('signin');
+function AuthScreen({ busy, onBack, onSubmit, onVerifyPhone, initialMode = 'signin', pendingPhone = '' }) {
+  const [mode, setMode] = useState(initialMode);
+  const [method, setMethod] = useState('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   return (
     <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <PageHeader title={mode === 'signin' ? 'Welcome back' : 'Create account'} subtitle="Securely access your bookings" onBack={onBack} />
+      <PageHeader title={mode === 'verify-phone' ? 'Verify your phone' : mode === 'signin' ? 'Welcome back' : 'Create account'} subtitle={mode === 'verify-phone' ? 'Enter the SMS code sent to ' + pendingPhone : 'Your tickets stay connected to your account'} onBack={onBack} />
       <ScrollView contentContainerStyle={styles.centerContent} keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
-          <View style={styles.segmentRow}>
-            <TouchableOpacity style={[styles.segment, mode === 'signin' && styles.segmentActive]} onPress={() => setMode('signin')}><Text style={[styles.segmentText, mode === 'signin' && styles.segmentTextActive]}>Sign in</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.segment, mode === 'signup' && styles.segmentActive]} onPress={() => setMode('signup')}><Text style={[styles.segmentText, mode === 'signup' && styles.segmentTextActive]}>Create account</Text></TouchableOpacity>
-          </View>
-          {mode === 'signup' && <><Field label="FULL NAME" value={fullName} onChangeText={setFullName} placeholder="Your name" /><Field label="PHONE NUMBER" value={phone} onChangeText={setPhone} placeholder="078… / +250…" keyboardType="phone-pad" /></>}
-          <Field label="EMAIL" value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" />
-          <Field label="PASSWORD" value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry />
-          <PrimaryButton title={busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'} disabled={busy} onPress={() => onSubmit(mode, { email, password, fullName, phone })} />
-          <Text style={styles.disclaimer}>Email confirmation may be required, depending on the Supabase project settings.</Text>
+          {mode === 'verify-phone' ? (
+            <>
+              <Field label="SMS VERIFICATION CODE" value={verificationCode} onChangeText={setVerificationCode} placeholder="6-digit code" keyboardType="number-pad" />
+              <PrimaryButton title={busy ? 'Verifying…' : 'Verify phone number'} disabled={busy || verificationCode.trim().length < 4} onPress={() => onVerifyPhone(verificationCode.trim())} />
+            </>
+          ) : (
+            <>
+              <View style={styles.segmentRow}>
+                <TouchableOpacity style={[styles.segment, mode === 'signin' && styles.segmentActive]} onPress={() => setMode('signin')}><Text style={[styles.segmentText, mode === 'signin' && styles.segmentTextActive]}>Sign in</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.segment, mode === 'signup' && styles.segmentActive]} onPress={() => setMode('signup')}><Text style={[styles.segmentText, mode === 'signup' && styles.segmentTextActive]}>Create account</Text></TouchableOpacity>
+              </View>
+              <View style={styles.segmentRow}>
+                <TouchableOpacity style={[styles.segment, method === 'phone' && styles.segmentActive]} onPress={() => setMethod('phone')}><Text style={[styles.segmentText, method === 'phone' && styles.segmentTextActive]}>Phone</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.segment, method === 'email' && styles.segmentActive]} onPress={() => setMethod('email')}><Text style={[styles.segmentText, method === 'email' && styles.segmentActive && styles.segmentTextActive]}>Email</Text></TouchableOpacity>
+              </View>
+              {mode === 'signup' && <Field label="FULL NAME" value={fullName} onChangeText={setFullName} placeholder="Your name" autoCapitalize="words" />}
+              {method === 'phone' ? <Field label="PHONE NUMBER" value={phone} onChangeText={setPhone} placeholder="+250 78… or 078…" keyboardType="phone-pad" /> : <Field label="EMAIL" value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />}
+              <Field label="PASSWORD" value={password} onChangeText={setPassword} placeholder="At least 8 characters" secureTextEntry autoCapitalize="none" />
+              <PrimaryButton title={busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'} disabled={busy} onPress={() => onSubmit(mode, { method, email, password, fullName, phone })} />
+              {method === 'email' && mode === 'signin' && (
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 15 }}><View style={{ height: 1, flex: 1, backgroundColor: C.border }} /><Text style={styles.muted}>or continue with</Text><View style={{ height: 1, flex: 1, backgroundColor: C.border }} /></View>
+                  <PrimaryButton title={busy ? 'Opening Google…' : 'Continue with Google'} disabled={busy} onPress={() => onSubmit('google', {})} secondary />
+                </>
+              )}
+              <Text style={styles.disclaimer}>Phone registration requires SMS verification. Email and Google sign-in depend on the authentication providers enabled in Supabase.</Text>
+            </>
+          )}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
 function Field({ label, value, onChangeText, placeholder, ...props }) {
   return <View style={styles.fieldWrap}><Text style={styles.inputLabel}>{label}</Text><TextInput style={styles.input} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={C.muted} {...props} /></View>;
 }
