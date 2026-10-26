@@ -6,6 +6,21 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "urugendo-passenger",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/YOUR_PASSENGER_PROJECT_ID",
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD",
+      "enabled": true
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#22C55E"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.urugendo.passenger"
@@ -13,12 +28,17 @@
     "android": {
       "package": "com.urugendo.passenger",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#16A34A"
       }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "urugendo-passenger"
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_PASSENGER_PROJECT_ID"
+      }
+    }
   }
 }
