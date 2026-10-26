@@ -1,1 +1,1 @@
-PLACEHOLDER_REPLACE
+export { default } from './src/AgencyApp';
