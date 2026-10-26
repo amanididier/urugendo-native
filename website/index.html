@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Urugendo — Bus travel, simply</title>
+  <meta name="description" content="Urugendo connects travellers with Rwanda's bus agencies. Book seats, pay with MoMo, and manage trips in one calm app." />
+  <link rel="icon" href="logo.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --green: #16A34A;
+      --green-dark: #15803D;
+      --green-soft: #DCFCE7;
+      --green-header: #22C55E;
+      --ink: #0F172A;
+      --muted: #64748B;
+      --line: #E2E8F0;
+      --bg: #F8FAFC;
+      --white: #FFFFFF;
+      --radius: 20px;
+      --shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background: var(--white);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; }
+    .wrap { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    header {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+    }
+    header.scrolled { border-bottom-color: var(--line); }
+    .nav {
+      display: flex; align-items: center; justify-content: space-between; height: 68px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 800; font-size: 1.15rem; letter-spacing: -0.02em;
+    }
+    .brand img { width: 36px; height: 36px; }
+    .nav-links {
+      display: flex; align-items: center; gap: 28px;
+      font-size: 0.92rem; font-weight: 500; color: var(--muted);
+    }
+    .nav-links a:hover { color: var(--ink); }
+    .nav-cta {
+      background: var(--green); color: #fff !important;
+      padding: 10px 18px; border-radius: 999px; font-weight: 600;
+    }
+    .nav-cta:hover { background: var(--green-dark); }
+    .hero { padding: 72px 0 56px; text-align: center; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--green-soft); color: var(--green-dark);
+      font-size: 0.82rem; font-weight: 600;
+      padding: 6px 14px; border-radius: 999px; margin-bottom: 22px;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5.5vw, 3.75rem);
+      font-weight: 800; letter-spacing: -0.04em; line-height: 1.08;
+      max-width: 16ch; margin: 0 auto 18px;
+    }
+    .hero h1 span { color: var(--green); }
+    .hero-lead {
+      font-size: 1.125rem; color: var(--muted);
+      max-width: 36rem; margin: 0 auto 36px;
+    }
+    .hero-actions {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      justify-content: center; margin-bottom: 48px;
+    }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 14px 22px; border-radius: 14px;
+      font-weight: 600; font-size: 0.98rem;
+      border: 1px solid transparent;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: var(--green); color: #fff;
+      box-shadow: 0 10px 28px rgba(22, 163, 74, 0.28);
+    }
+    .btn-primary:hover { background: var(--green-dark); }
+    .btn-secondary {
+      background: var(--white); border-color: var(--line); color: var(--ink);
+    }
+    .btn-secondary:hover { background: var(--bg); }
+    .phone-stage {
+      margin: 0 auto; width: min(280px, 70vw);
+      background: linear-gradient(160deg, var(--green-header), var(--green-dark));
+      border-radius: 36px; padding: 18px 14px 28px;
+      box-shadow: var(--shadow); color: #fff; text-align: left;
+    }
+    .phone-top { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+    .phone-top img {
+      width: 32px; height: 32px; background: #fff; border-radius: 50%; padding: 4px;
+    }
+    .phone-greet { opacity: 0.9; font-size: 0.9rem; margin-bottom: 4px; }
+    .phone-title { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 20px; }
+    .phone-card {
+      background: #fff; color: var(--ink); border-radius: 18px; padding: 16px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+    }
+    .phone-row {
+      display: flex; align-items: center; gap: 10px; padding: 10px 0;
+      font-size: 0.9rem; color: var(--muted);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot-g { background: var(--green); }
+    .dot-o { background: #F59E0B; }
+    .phone-search {
+      margin-top: 12px; background: var(--green-soft); color: var(--green-dark);
+      text-align: center; padding: 12px; border-radius: 12px; font-weight: 700; font-size: 0.9rem;
+    }
+    .section { padding: 80px 0; }
+    .section-muted { background: var(--bg); }
+    .section-head { max-width: 34rem; margin-bottom: 40px; }
+    .section-head h2 {
+      font-size: clamp(1.75rem, 3.5vw, 2.35rem);
+      font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; margin-bottom: 12px;
+    }
+    .section-head p { color: var(--muted); font-size: 1.05rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    @media (max-width: 840px) {
+      .grid-3 { grid-template-columns: 1fr; }
+      .nav-links .hide-sm { display: none; }
+    }
+    .card {
+      background: var(--white); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 24px;
+    }
+    .card-icon {
+      width: 44px; height: 44px; border-radius: 12px; background: var(--green-soft);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.25rem; margin-bottom: 16px;
+    }
+    .card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+    .card p { color: var(--muted); font-size: 0.95rem; }
+    #download { padding: 88px 0; }
+    .download-intro { text-align: center; max-width: 32rem; margin: 0 auto 40px; }
+    .download-intro h2 {
+      font-size: clamp(1.85rem, 3.5vw, 2.5rem);
+      font-weight: 800; letter-spacing: -0.03em; margin-bottom: 12px;
+    }
+    .download-intro p { color: var(--muted); }
+    .download-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+      max-width: 820px; margin: 0 auto;
+    }
+    @media (max-width: 720px) { .download-grid { grid-template-columns: 1fr; } }
+    .dl-card {
+      border-radius: 24px; padding: 32px 28px;
+      border: 1px solid var(--line); background: var(--white);
+      box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 18px;
+    }
+    .dl-card.passenger {
+      background: linear-gradient(165deg, #F0FDF4 0%, #fff 55%);
+      border-color: #BBF7D0;
+    }
+    .dl-badge {
+      display: inline-flex; align-self: flex-start;
+      font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+      padding: 5px 10px; border-radius: 999px;
+      background: var(--green-soft); color: var(--green-dark);
+    }
+    .dl-card.agency .dl-badge { background: #F1F5F9; color: var(--muted); }
+    .dl-card h3 { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.03em; }
+    .dl-card p { color: var(--muted); font-size: 0.98rem; flex: 1; }
+    .dl-card .btn { width: 100%; }
+    .dl-meta { font-size: 0.8rem; color: var(--muted); text-align: center; }
+    footer { border-top: 1px solid var(--line); padding: 36px 0 48px; }
+    .footer-row {
+      display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+      justify-content: space-between; color: var(--muted); font-size: 0.9rem;
+    }
+    .footer-brand {
+      display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--ink);
+    }
+    .footer-brand img { width: 24px; height: 24px; }
+  </style>
+</head>
+<body>
+  <header id="site-header">
+    <div class="wrap nav">
+      <a class="brand" href="#">
+        <img src="logo.png" alt="" width="36" height="36" />
+        Urugendo
+      </a>
+      <nav class="nav-links">
+        <a class="hide-sm" href="#features">Product</a>
+        <a class="hide-sm" href="#download">Apps</a>
+        <a class="nav-cta" href="#download">Get the apps</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero wrap">
+      <div class="eyebrow">Built for Rwanda’s roads</div>
+      <h1>Bus travel, <span>beautifully simple.</span></h1>
+      <p class="hero-lead">
+        Book intercity buses, pay with MoMo, and manage tickets in one calm experience —
+        for travellers and the agencies that move them.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#download-passenger">Download for travellers</a>
+        <a class="btn btn-secondary" href="#download-agency">Agency app</a>
+      </div>
+      <div class="phone-stage" aria-hidden="true">
+        <div class="phone-top">
+          <img src="logo.png" alt="" />
+          <strong>Urugendo.</strong>
+        </div>
+        <p class="phone-greet">Muraho 👋</p>
+        <p class="phone-title">Where to today?</p>
+        <div class="phone-card">
+          <div class="phone-row"><span class="dot dot-g"></span> From · Kigali</div>
+          <div class="phone-row"><span class="dot dot-o"></span> To · Musanze</div>
+          <div class="phone-search">Search buses</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-muted" id="features">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Everyday travel, without the friction.</h2>
+          <p>
+            One product for people on the move and the operators who run the routes —
+            same data, clear roles, no clutter.
+          </p>
+        </div>
+        <div class="grid-3">
+          <article class="card">
+            <div class="card-icon">🔍</div>
+            <h3>Find a bus fast</h3>
+            <p>Search routes and times across agencies. See seats and fares before you commit.</p>
+          </article>
+          <article class="card">
+            <div class="card-icon">📱</div>
+            <h3>Pay with MoMo</h3>
+            <p>Reserve seats and request payment the way Rwanda already pays — clear, on your phone.</p>
+          </article>
+          <article class="card">
+            <div class="card-icon">🎫</div>
+            <h3>Tickets that work</h3>
+            <p>Booking codes and QR-ready tickets your agent can verify at the station.</p>
+          </article>
+          <article class="card">
+            <div class="card-icon">🏢</div>
+            <h3>Agency control</h3>
+            <p>Agents verify and sell; managers schedule capacity that the passenger app respects.</p>
+          </article>
+          <article class="card">
+            <div class="card-icon">🟢</div>
+            <h3>Live with the same DB</h3>
+            <p>Native apps share the Urugendo backend — one source of truth for trips and bookings.</p>
+          </article>
+          <article class="card">
+            <div class="card-icon">🇷🇼</div>
+            <h3>Designed for here</h3>
+            <p>Kigali to Musanze, Huye, and beyond — calm UI, local flows, no noise.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="download">
+      <div class="wrap">
+        <div class="download-intro">
+          <h2>You’re ready. Get the apps.</h2>
+          <p>
+            Two separate apps — one for travellers, one for agencies.
+            Android builds first; iOS when you’re ready for the stores.
+          </p>
+        </div>
+        <div class="download-grid">
+          <div class="dl-card passenger" id="download-passenger">
+            <span class="dl-badge">Travellers</span>
+            <h3>Urugendo</h3>
+            <p>Search buses, book seats, pay with MoMo, and keep your tickets in one place.</p>
+            <a class="btn btn-primary" id="btn-passenger" href="#passenger-apk" data-apk="">Download Android</a>
+            <p class="dl-meta">APK for Android · iOS coming later</p>
+          </div>
+          <div class="dl-card agency" id="download-agency">
+            <span class="dl-badge">Agencies</span>
+            <h3>Urugendo Agency</h3>
+            <p>Sign in as agent or manager. Verify tickets, see the day, and schedule capacity.</p>
+            <a class="btn btn-secondary" id="btn-agency" href="#agency-apk" data-apk="">Download Android</a>
+            <p class="dl-meta">Staff only · Separate from the traveller app</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap footer-row">
+      <div class="footer-brand">
+        <img src="logo.png" alt="" width="24" height="24" />
+        Urugendo
+      </div>
+      <span>Made with care for Rwanda’s travellers</span>
+      <span>© <span id="y"></span> Urugendo</span>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('y').textContent = new Date().getFullYear();
+    window.addEventListener('scroll', function () {
+      document.getElementById('site-header').classList.toggle('scrolled', window.scrollY > 8);
+    });
+    function wireDownload(btnId, label) {
+      var btn = document.getElementById(btnId);
+      btn.addEventListener('click', function (e) {
+        if (!btn.getAttribute('data-apk')) {
+          e.preventDefault();
+          alert(label + ' build is not linked yet.\n\nAfter you generate the APK, set data-apk on the button.');
+        }
+      });
+    }
+    wireDownload('btn-passenger', 'Passenger');
+    wireDownload('btn-agency', 'Agency');
+  </script>
+</body>
+</html>
